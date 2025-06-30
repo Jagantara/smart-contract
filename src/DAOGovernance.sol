@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-interface IERC20 {
-    function balanceOf(address account) external view returns (uint256);
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+interface IInsuranceManager() {
+    function isActive(address user) public view returns (bool);
 }
 
 contract DAOGovernance {
@@ -51,8 +53,9 @@ contract DAOGovernance {
     event ClaimApproved(uint256 indexed claimId);
     event ClaimRejected(uint256 indexed claimId);
 
-    constructor(address _jagaToken) {
+    constructor(address _jagaToken, address _insuranceManager) {
         jagaToken = IERC20(_jagaToken);
+        insuranceManager = IInsuraceManager(_insuranceManager);
     }
 
     modifier onlyClaimOwner(uint256 claimId) {
@@ -64,14 +67,15 @@ contract DAOGovernance {
         string calldata reason,
         uint256 amount
     ) external returns (uint256) {
+        require(insuranceManager.isActive(msg.sender), "Invalid User");
         uint256 id = claimCounter++;
 
-        ClaimProposal storage p = _claims[id];
-        p.claimant = msg.sender;
-        p.reason = reason;
-        p.amount = amount;
-        p.createdAt = block.timestamp;
-        p.status = ClaimStatus.Pending;
+        ClaimProposal storage proposal = _claims[id];
+        proposal.claimant = msg.sender;
+        proposal.reason = reason;
+        proposal.amount = amount;
+        proposal.createdAt = block.timestamp;
+        proposal.status = ClaimStatus.Pending;
 
         claimOwner[id] = msg.sender;
 
@@ -138,8 +142,8 @@ contract DAOGovernance {
     function getClaimData(
         uint256 claimId
     ) external view returns (address, uint256, uint256) {
-        ClaimProposal storage p = _claims[claimId];
-        return (p.claimant, p.amount, p.approvedAt);
+        ClaimProposal storage proposal = _claims[claimId];
+        return (proposal.claimant, proposal.amount, proposal.approvedAt);
     }
 
     function getClaimStatus(
