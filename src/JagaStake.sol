@@ -16,15 +16,14 @@ contract JagaStake {
     JagaToken public jagaToken;
     address public claimManager;
     address public owner;
+    uint256 public sessionCounter; // current session number
+    uint256 public sessionStart; // timestamp of current session start
 
     struct Session {
         uint256 totalStaked;
         uint256 totalReward;
         bool finalized;
     }
-
-    uint256 public sessionCounter; // current session number
-    uint256 public sessionStart; // timestamp of current session start
 
     mapping(address => uint256) public currentStake;
     mapping(uint256 => Session) public sessions;
@@ -63,11 +62,6 @@ contract JagaStake {
                 uint256 newSession = sessionCounter + i;
                 sessions[newSession].totalStaked = sessions[sessionCounter]
                     .totalStaked;
-
-                // Snapshot each user's current stake
-                // In production, this should be replaced with off-chain snapshot or event-based claiming.
-                // For simplicity, this version assumes users manually call `stake()` or `unstake()` between sessions
-                // to populate sessionStake[session][user].
             }
 
             sessionStart += sessionsPassed * SESSION_DURATION;
@@ -81,8 +75,9 @@ contract JagaStake {
         require(amount > 0, "Zero stake");
 
         currentStake[msg.sender] += amount;
-        sessions[sessionCounter].totalStaked += amount;
-        sessionStake[sessionCounter][msg.sender] += amount;
+        // only able to stake the next session
+        sessions[sessionCounter + 1].totalStaked += amount;
+        sessionStake[sessionCounter + 1][msg.sender] += amount;
 
         require(
             usdc.transferFrom(msg.sender, address(this), amount),
@@ -151,6 +146,10 @@ contract JagaStake {
 
     function nextSessionStart() external view returns (uint256) {
         return sessionStart + SESSION_DURATION;
+    }
+
+    function timeLeft() external view updateSession returns (uint256) {
+        return SESSION_DURATION - (sessionStart + block.timestamp);
     }
 
     function getJagaToken() external view returns (address) {
