@@ -21,6 +21,7 @@ contract ClaimManager {
     address public usdc;
     address public daoGovernance;
     address public jagaStake;
+    address public owner;
 
     mapping(uint256 => bool) public claimExecuted;
 
@@ -36,10 +37,14 @@ contract ClaimManager {
         _;
     }
 
-    constructor(address _usdc, address _daoGovernance, address _jagaStake) {
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    constructor(address _usdc) {
+        owner = msg.sender;
         usdc = _usdc;
-        daoGovernance = _daoGovernance;
-        jagaStake = _jagaStake;
     }
 
     // Claimer calls this to withdraw their claim (after DAO approval)
@@ -72,5 +77,13 @@ contract ClaimManager {
     // Optional: admin view of balance
     function vaultBalance() external view returns (uint256) {
         return IERC20(usdc).balanceOf(address(this));
+    }
+
+    function setConfig(
+        address _daoGovernance,
+        address _jagaStake
+    ) external onlyOwner {
+        daoGovernance = _daoGovernance;
+        jagaStake = _jagaStake;
     }
 }

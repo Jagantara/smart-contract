@@ -35,6 +35,7 @@ contract DAOGovernance {
     uint256 public constant VOTING_PERIOD = 7 days;
     uint256 public constant THRESHOLD = 66; // 66% = 2/3
     address public insuranceManager;
+    address public owner;
 
     uint256 public claimCounter;
     mapping(uint256 => ClaimProposal) private _claims;
@@ -57,10 +58,16 @@ contract DAOGovernance {
     constructor(address _jagaToken, address _insuranceManager) {
         jagaToken = IERC20(_jagaToken);
         insuranceManager = _insuranceManager;
+        owner = msg.sender;
     }
 
     modifier onlyClaimOwner(uint256 claimId) {
         require(_claims[claimId].claimant == msg.sender, "Not claimant");
+        _;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
         _;
     }
 
@@ -154,5 +161,13 @@ contract DAOGovernance {
         uint256 claimId
     ) external view returns (ClaimStatus) {
         return _claims[claimId].status;
+    }
+
+    function setConfig(
+        address _jagaToken,
+        address _insuranceManager
+    ) external onlyOwner {
+        jagaToken = IERC20(_jagaToken);
+        insuranceManager = _insuranceManager;
     }
 }

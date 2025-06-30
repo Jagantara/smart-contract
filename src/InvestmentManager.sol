@@ -24,10 +24,9 @@ contract InvestmentManagerVault {
         _;
     }
 
-    constructor(address _owner, address _usdc, address _jagaStake) {
+    constructor(address _owner, address _usdc) {
         owner = _owner;
         usdc = IERC20(_usdc);
-        jagaStakeAddress = _jagaStake;
     }
 
     // Owner-controlled withdrawal (for DAO use or rebalancing)
@@ -72,5 +71,9 @@ contract InvestmentManagerVault {
     // View current balance
     function vaultBalance() public view returns (uint256) {
         return usdc.balanceOf(address(this));
+    }
+
+    function setConfig(address _jagaStake) external onlyOwner {
+        jagaStakeAddress = _jagaStake;
     }
 }

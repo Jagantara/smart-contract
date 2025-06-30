@@ -15,6 +15,7 @@ contract JagaStake {
     address public insuranceManager;
     JagaToken public jagaToken;
     address public claimManager;
+    address public owner;
 
     struct Session {
         uint256 totalStaked;
@@ -35,18 +36,17 @@ contract JagaStake {
     event Claimed(address indexed user, uint256 session, uint256 reward);
     event RevenueAdded(uint256 session, uint256 amount);
 
-    constructor(
-        address _usdc,
-        address _insuranceManager,
-        address _claimManager,
-        address _jagaToken
-    ) {
-        insuranceManager = _insuranceManager;
-        claimManager = _claimManager;
+    constructor(address _usdc) {
         usdc = IERC20(_usdc);
         sessionStart = block.timestamp;
         sessionCounter = 0;
         jagaToken = new JagaToken();
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
     }
 
     modifier updateSession() {
@@ -145,6 +145,10 @@ contract JagaStake {
         return sessionStart + SESSION_DURATION;
     }
 
+    function getJagaToken() external view returns (address) {
+        return address(jagaToken);
+    }
+
     function pendingReward(
         address user,
         uint256 sessionId
@@ -164,5 +168,13 @@ contract JagaStake {
     function withdraw(uint256 amount) external {
         require(msg.sender == claimManager, "Invalid user");
         IERC20(usdc).transfer(msg.sender, amount);
+    }
+
+    function setConfig(
+        address _insuranceManager,
+        address _claimManager
+    ) external onlyOwner {
+        insuranceManager = _insuranceManager;
+        claimManager = _claimManager;
     }
 }
