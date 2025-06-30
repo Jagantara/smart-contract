@@ -13,11 +13,9 @@ contract InvestmentManagerVault {
     address public owner;
     address public jagaStakeAddress;
     IERC20 public immutable usdc;
+    uint256 totalStaked;
 
-    event Deposit(address indexed from, uint256 amount);
-    event Withdrawn(address indexed to, uint256 amount);
-    event ClaimManagerFunded(address indexed to, uint256 amount);
-    event ClaimManagerUpdated(address indexed newClaimManager);
+    event Withdrawn(address indexed to, uint256 indexed amount);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Not owner");
@@ -37,10 +35,12 @@ contract InvestmentManagerVault {
 
     function stake() external onlyOwner {
         uint256 usdcBalance = vaultBalance();
+        totalStaked += usdcBalance;
         IJagaStake(jagaStakeAddress).stake(usdcBalance);
     }
 
     function unstake(uint256 amount) external onlyOwner {
+        totalStaked -= amount;
         IJagaStake(jagaStakeAddress).unstake(amount);
     }
 
@@ -71,6 +71,10 @@ contract InvestmentManagerVault {
     // View current balance
     function vaultBalance() public view returns (uint256) {
         return usdc.balanceOf(address(this));
+    }
+
+    function getAmountStaked() public view returns (uint256) {
+        return totalStaked;
     }
 
     function setConfig(address _jagaStake) external onlyOwner {
