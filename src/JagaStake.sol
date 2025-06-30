@@ -2,10 +2,19 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {JagaToken} from "./JagaToken.sol";
+
+interface IJagaToken {
+    function mint(address _to, uint256 _amount) external;
+    function burn(address _to, uint256 _amount) external;
+}
 
 contract JagaStake {
     IERC20 public immutable usdc;
     uint256 public constant SESSION_DURATION = 30 days;
+    address public insuranceManager;
+    JagaToken public jagaToken;
+    address public claimManager;
 
     struct Session {
         uint256 totalStaked;
@@ -13,64 +22,89 @@ contract JagaStake {
         bool finalized;
     }
 
-    uint256 public sessionCounter; // current session index
+    uint256 public sessionCounter; // current session number
     uint256 public sessionStart; // timestamp of current session start
 
-    mapping(uint256 => Session) public sessions; // sessionId => session info
-    mapping(address => uint256) public userStake; // active amount (across sessions)
-    mapping(address => bool) public isActive; // is staker currently active
-    mapping(uint256 => mapping(address => bool)) public assignedToSession;
-    mapping(uint256 => mapping(address => bool)) public claimedReward;
+    mapping(address => uint256) public currentStake;
+    mapping(uint256 => Session) public sessions;
+    mapping(uint256 => mapping(address => uint256)) public sessionStake;
+    mapping(uint256 => mapping(address => bool)) public claimed;
 
-    event Assigned(address indexed user, uint256 session);
-    event RevenueAdded(uint256 session, uint256 amount);
-    event Claimed(address indexed user, uint256 session, uint256 reward);
+    event Staked(address indexed user, uint256 amount);
     event Unstaked(address indexed user, uint256 amount);
+    event Claimed(address indexed user, uint256 session, uint256 reward);
+    event RevenueAdded(uint256 session, uint256 amount);
 
-    constructor(address _usdc) {
+    constructor(
+        address _usdc,
+        address _insuranceManager,
+        address _claimManager,
+        address _jagaToken
+    ) {
+        insuranceManager = _insuranceManager;
+        claimManager = _claimManager;
         usdc = IERC20(_usdc);
         sessionStart = block.timestamp;
+        sessionCounter = 0;
+        jagaToken = new JagaToken();
     }
 
     modifier updateSession() {
-        uint256 nowTime = block.timestamp;
-        uint256 elapsed = nowTime - sessionStart;
-        uint256 nextSession = sessionCounter;
+        uint256 elapsed = block.timestamp - sessionStart;
 
         if (elapsed >= SESSION_DURATION) {
-            uint256 sessionAdvance = elapsed / SESSION_DURATION;
-            nextSession += sessionAdvance;
-            sessionStart += sessionAdvance * SESSION_DURATION;
-            sessionCounter = nextSession;
+            uint256 sessionsPassed = elapsed / SESSION_DURATION;
+
+            for (uint256 i = 1; i <= sessionsPassed; i++) {
+                uint256 newSession = sessionCounter + i;
+                sessions[newSession].totalStaked = sessions[sessionCounter]
+                    .totalStaked;
+
+                // Snapshot each user's current stake
+                // In production, this should be replaced with off-chain snapshot or event-based claiming.
+                // For simplicity, this version assumes users manually call `stake()` or `unstake()` between sessions
+                // to populate sessionStake[session][user].
+            }
+
+            sessionStart += sessionsPassed * SESSION_DURATION;
+            sessionCounter += sessionsPassed;
         }
 
         _;
     }
 
-    // Assign yourself to upcoming session before it starts
-    function assignToNextSession(uint256 amount) external updateSession {
-        require(amount > 0, "Zero amount");
-        require(
-            !assignedToSession[sessionCounter + 1][msg.sender],
-            "Already assigned"
-        );
+    function stake(uint256 amount) external updateSession {
+        require(amount > 0, "Zero stake");
+
+        currentStake[msg.sender] += amount;
+        sessions[sessionCounter].totalStaked += amount;
+        sessionStake[sessionCounter][msg.sender] += amount;
 
         require(
             usdc.transferFrom(msg.sender, address(this), amount),
             "Transfer failed"
         );
 
-        userStake[msg.sender] += amount;
-        isActive[msg.sender] = true;
+        IJagaToken(address(jagaToken)).mint(msg.sender, amount);
 
-        uint256 targetSession = sessionCounter + 1;
-        assignedToSession[targetSession][msg.sender] = true;
-        sessions[targetSession].totalStaked += amount;
+        emit Staked(msg.sender, amount);
+    }
 
-        emit Assigned(msg.sender, targetSession);
+    function unstake(uint256 amount) external updateSession {
+        require(currentStake[msg.sender] >= amount, "Insufficient stake");
+
+        currentStake[msg.sender] -= amount;
+        sessions[sessionCounter].totalStaked -= amount;
+        sessionStake[sessionCounter][msg.sender] -= amount;
+
+        require(usdc.transfer(msg.sender, amount), "Transfer failed");
+        IJagaToken(address(jagaToken)).mint(msg.sender, amount);
+
+        emit Unstaked(msg.sender, amount);
     }
 
     function addRevenue(uint256 sessionId, uint256 amount) external {
+        require(msg.sender == insuranceManager, "You're not allowed!");
         require(sessionId < sessionCounter, "Can only reward past sessions");
         require(!sessions[sessionId].finalized, "Already finalized");
 
@@ -78,39 +112,31 @@ contract JagaStake {
             usdc.transferFrom(msg.sender, address(this), amount),
             "Transfer failed"
         );
+
         sessions[sessionId].totalReward += amount;
         sessions[sessionId].finalized = true;
 
         emit RevenueAdded(sessionId, amount);
     }
 
-    function claim(uint256 sessionId) external {
-        require(assignedToSession[sessionId][msg.sender], "Not assigned");
-        require(!claimedReward[sessionId][msg.sender], "Already claimed");
+    function claim(uint256 sessionId) external updateSession {
         require(sessions[sessionId].finalized, "Not finalized");
+        require(!claimed[sessionId][msg.sender], "Already claimed");
 
-        uint256 stake = userStake[msg.sender];
-        uint256 reward = (stake * sessions[sessionId].totalReward) /
-            sessions[sessionId].totalStaked;
+        uint256 sessionStaked = sessionStake[sessionId][msg.sender];
+        require(sessionStaked > 0, "No stake");
 
-        claimedReward[sessionId][msg.sender] = true;
+        uint256 total = sessions[sessionId].totalStaked;
+        uint256 reward = (sessionStaked * sessions[sessionId].totalReward) /
+            total;
+
+        claimed[sessionId][msg.sender] = true;
+
         require(usdc.transfer(msg.sender, reward), "Claim failed");
-
         emit Claimed(msg.sender, sessionId, reward);
     }
 
-    function unstake() external {
-        require(isActive[msg.sender], "Not active");
-        uint256 amount = userStake[msg.sender];
-
-        isActive[msg.sender] = false;
-        userStake[msg.sender] = 0;
-
-        require(usdc.transfer(msg.sender, amount), "Unstake failed");
-        emit Unstaked(msg.sender, amount);
-    }
-
-    // Helpers
+    // Optional views
     function currentSession() external view returns (uint256) {
         return sessionCounter;
     }
@@ -119,27 +145,24 @@ contract JagaStake {
         return sessionStart + SESSION_DURATION;
     }
 
-    function isAssigned(
-        address user,
-        uint256 sessionId
-    ) external view returns (bool) {
-        return assignedToSession[sessionId][user];
-    }
-
     function pendingReward(
         address user,
         uint256 sessionId
     ) external view returns (uint256) {
-        if (
-            !assignedToSession[sessionId][user] ||
-            claimedReward[sessionId][user] ||
-            !sessions[sessionId].finalized
-        ) {
+        if (claimed[sessionId][user] || !sessions[sessionId].finalized) {
             return 0;
         }
 
-        return
-            (userStake[user] * sessions[sessionId].totalReward) /
+        uint256 userShare = sessionStake[sessionId][user];
+        if (userShare == 0) return 0;
+
+        uint256 reward = (userShare * sessions[sessionId].totalReward) /
             sessions[sessionId].totalStaked;
+        return reward;
+    }
+
+    function withdraw(uint256 amount) external {
+        require(msg.sender == claimManager, "Invalid user");
+        IERC20(usdc).transfer(msg.sender, amount);
     }
 }

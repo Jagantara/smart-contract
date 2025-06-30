@@ -3,8 +3,8 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-interface IInsuranceManager() {
-    function isActive(address user) public view returns (bool);
+interface IInsuranceManager {
+    function isActive(address user) external view returns (bool);
 }
 
 contract DAOGovernance {
@@ -34,6 +34,7 @@ contract DAOGovernance {
     IERC20 public jagaToken;
     uint256 public constant VOTING_PERIOD = 7 days;
     uint256 public constant THRESHOLD = 66; // 66% = 2/3
+    address public insuranceManager;
 
     uint256 public claimCounter;
     mapping(uint256 => ClaimProposal) private _claims;
@@ -55,7 +56,7 @@ contract DAOGovernance {
 
     constructor(address _jagaToken, address _insuranceManager) {
         jagaToken = IERC20(_jagaToken);
-        insuranceManager = IInsuraceManager(_insuranceManager);
+        insuranceManager = _insuranceManager;
     }
 
     modifier onlyClaimOwner(uint256 claimId) {
@@ -67,7 +68,10 @@ contract DAOGovernance {
         string calldata reason,
         uint256 amount
     ) external returns (uint256) {
-        require(insuranceManager.isActive(msg.sender), "Invalid User");
+        require(
+            IInsuranceManager(insuranceManager).isActive(msg.sender),
+            "Invalid User"
+        );
         uint256 id = claimCounter++;
 
         ClaimProposal storage proposal = _claims[id];
@@ -84,25 +88,25 @@ contract DAOGovernance {
     }
 
     function vote(uint256 claimId, bool approve) external {
-        ClaimProposal storage p = _claims[claimId];
-        require(p.status == ClaimStatus.Pending, "Voting closed");
+        ClaimProposal storage proposal = _claims[claimId];
+        require(proposal.status == ClaimStatus.Pending, "Voting closed");
         require(
-            block.timestamp <= p.createdAt + VOTING_PERIOD,
+            block.timestamp <= proposal.createdAt + VOTING_PERIOD,
             "Voting expired"
         );
 
-        VoteType prev = p.votes[msg.sender];
+        VoteType prev = proposal.votes[msg.sender];
         require(prev == VoteType.Null, "Already voted");
 
         uint256 weight = jagaToken.balanceOf(msg.sender);
         require(weight > 0, "No voting power");
 
         if (approve) {
-            p.yesVotes += weight;
-            p.votes[msg.sender] = VoteType.Yes;
+            proposal.yesVotes += weight;
+            proposal.votes[msg.sender] = VoteType.Yes;
         } else {
-            p.noVotes += weight;
-            p.votes[msg.sender] = VoteType.No;
+            proposal.noVotes += weight;
+            proposal.votes[msg.sender] = VoteType.No;
         }
 
         emit Voted(claimId, msg.sender, approve, weight);

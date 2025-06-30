@@ -7,12 +7,17 @@ interface IClaimManager {
     function receiveRevenue(uint256 amount) external;
 }
 
+interface IJagaStake {
+    function addRevenue(uint256 sessionId, uint256 amount) external;
+}
+
 contract InsuranceManager {
     address public owner;
     address public jagaStakeContract;
     address public claimManagerContract;
-    address public InvestmentManagerContract;
+    address public investmentManagerContract;
     uint256 public premiumPrice;
+    uint256 public premiumDuration;
 
     IERC20 public usdc;
 
@@ -23,11 +28,10 @@ contract InsuranceManager {
 
     mapping(address => Policy) public policies;
 
-    uint256 public lastRevenueTransfer;
     uint256 public totalCollected;
 
     event PremiumPaid(address indexed user, uint256 amount);
-    event RevenueTransferred(address to, uint256 amount);
+    event RevenueTransferred(uint256 indexed amount);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Not owner");
@@ -42,7 +46,6 @@ contract InsuranceManager {
         owner = msg.sender;
         usdc = IERC20(_usdc);
         premiumPrice = _premiumPrice;
-        lastRevenueTransfer = block.timestamp;
         premiumDuration = _premiumDuration;
     }
 
@@ -54,17 +57,17 @@ contract InsuranceManager {
 
         policies[msg.sender].lastPaidAt = block.timestamp;
         policies[msg.sender].active = true;
-        totalCollected += PREMIUM;
+        totalCollected += premiumPrice;
 
-        emit PremiumPaid(msg.sender, PREMIUM);
+        emit PremiumPaid(msg.sender, premiumPrice);
     }
 
-    function isActive(address user) public view returns (bool) {
+    function isActive(address user) external view returns (bool) {
         Policy memory p = policies[user];
         return p.active && block.timestamp <= p.lastPaidAt + premiumDuration;
     }
 
-    function transferRevenue() external onlyOwner {
+    function transferRevenue(uint256 sessionId) external onlyOwner {
         uint256 balance = usdc.balanceOf(address(this));
         require(balance > 0, "No revenue");
 
@@ -72,12 +75,24 @@ contract InsuranceManager {
         uint256 ownerAllocation = (20 * balance) / 100;
         uint256 claimManagerAllocation = (25 * balance) / 100;
 
-        lastRevenueTransfer = block.timestamp;
-        usdc.transfer(address(jagaStakeContract), jagaStakeAllocation);
+        IJagaStake(jagaStakeContract).addRevenue(
+            sessionId,
+            jagaStakeAllocation
+        );
         usdc.transfer(address(owner), ownerAllocation);
         usdc.transfer(address(claimManagerContract), claimManagerAllocation);
-        usdc.transfer(address(InvestmentManagerContract), balance);
+        usdc.transfer(address(investmentManagerContract), balance);
 
         emit RevenueTransferred(balance);
+    }
+
+    function setConfig(
+        address _jagaStake,
+        address _claimManager,
+        address _investmentManager
+    ) external onlyOwner {
+        jagaStakeContract = _jagaStake;
+        claimManagerContract = _claimManager;
+        investmentManagerContract = _investmentManager;
     }
 }
