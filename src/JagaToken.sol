@@ -7,7 +7,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract JagaToken is ERC20, Ownable {
     constructor() ERC20("JagaToken", "JAGA") {}
 
-    function mint(address to, uint256 amount) external onlyOwner {
+    function mint(address _to, uint256 _amount) external onlyOwner {
         _mint(to, amount);
+    }
+
+    function burn(address _to, uint256 _amount) external onlyOwner {
+        _burn(to, amount);
     }
 }
