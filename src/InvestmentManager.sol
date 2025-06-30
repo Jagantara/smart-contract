@@ -3,9 +3,15 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+interface IJagaStake {
+    function stake(uint256 amount) external;
+    function unstake(uint256 amount) external;
+    function claim(uint256 sessionId) external;
+}
+
 contract InvestmentManagerVault {
     address public owner;
-    address public claimManager;
+    address public jagaStakeAddress;
     IERC20 public immutable usdc;
 
     event Deposit(address indexed from, uint256 amount);
@@ -18,24 +24,10 @@ contract InvestmentManagerVault {
         _;
     }
 
-    modifier onlyClaimManager() {
-        require(msg.sender == claimManager, "Only ClaimManager");
-        _;
-    }
-
-    constructor(address _usdc) {
-        owner = msg.sender;
+    constructor(address _owner, address _usdc, address _jagaStake) {
+        owner = _owner;
         usdc = IERC20(_usdc);
-    }
-
-    // Deposit USDC from DAO, external source, or strategy
-    function deposit(uint256 amount) external {
-        require(amount > 0, "Zero amount");
-        require(
-            usdc.transferFrom(msg.sender, address(this), amount),
-            "Transfer failed"
-        );
-        emit Deposit(msg.sender, amount);
+        jagaStakeAddress = _jagaStake;
     }
 
     // Owner-controlled withdrawal (for DAO use or rebalancing)
@@ -44,20 +36,41 @@ contract InvestmentManagerVault {
         emit Withdrawn(to, amount);
     }
 
-    // ClaimManager requests funds for payouts
-    function fundClaimManager(uint256 amount) external onlyClaimManager {
-        require(usdc.transfer(claimManager, amount), "Funding failed");
-        emit ClaimManagerFunded(claimManager, amount);
+    function stake() external onlyOwner {
+        uint256 usdcBalance = vaultBalance();
+        IJagaStake(jagaStakeAddress).stake(usdcBalance);
     }
 
-    // Set or update the ClaimManager contract
-    function setClaimManager(address _claimManager) external onlyOwner {
-        claimManager = _claimManager;
-        emit ClaimManagerUpdated(_claimManager);
+    function unstake(uint256 amount) external onlyOwner {
+        IJagaStake(jagaStakeAddress).unstake(amount);
+    }
+
+    function claim(uint256 sessionId) external onlyOwner {
+        IJagaStake(jagaStakeAddress).claim(sessionId);
+    }
+
+    /// @notice Call any function with custom params
+    /// @param target Address of the contract to call
+    /// @param funcSignature The function signature (e.g. "foo(uint256,address)")
+    /// @param params Encoded parameters (use abi.encode(...) externally)
+    function callFunction(
+        address target,
+        string calldata funcSignature,
+        bytes calldata params
+    ) external onlyOwner returns (bool success, bytes memory result) {
+        // Build function selector from string
+        bytes4 selector = bytes4(keccak256(bytes(funcSignature)));
+
+        // Merge selector and encoded params
+        bytes memory data = abi.encodePacked(selector, params);
+
+        // Call the target contract
+        (success, result) = target.call(data);
+        require(success, "Transaction Failed");
     }
 
     // View current balance
-    function vaultBalance() external view returns (uint256) {
+    function vaultBalance() public view returns (uint256) {
         return usdc.balanceOf(address(this));
     }
 }
