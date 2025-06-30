@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 interface IClaimManager {
     function receiveRevenue(uint256 amount) external;
 }
 
 contract InsuranceManager {
     address public owner;
-    address public revenueReceiver;
-    uint256 public constant PREMIUM = 10 * 1e6; // 10 USDC (6 decimals)
-    uint256 public constant CYCLE_DURATION = 30 days;
+    address public jagaStakeContract;
+    address public claimManagerContract;
+    address public InvestmentManagerContract;
+    uint256 public premiumPrice;
 
     IERC20 public usdc;
 
@@ -31,16 +34,21 @@ contract InsuranceManager {
         _;
     }
 
-    constructor(address _usdc, address _claimManager) {
+    constructor(
+        address _usdc,
+        uint256 _premiumPrice,
+        uint256 _premiumDuration
+    ) {
         owner = msg.sender;
         usdc = IERC20(_usdc);
-        revenueReceiver = _claimManager;
+        premiumPrice = _premiumPrice;
         lastRevenueTransfer = block.timestamp;
+        premiumDuration = _premiumDuration;
     }
 
     function payPremium() external {
         require(
-            usdc.transferFrom(msg.sender, address(this), PREMIUM),
+            usdc.transferFrom(msg.sender, address(this), premiumPrice),
             "Transfer failed"
         );
 
@@ -53,26 +61,23 @@ contract InsuranceManager {
 
     function isActive(address user) public view returns (bool) {
         Policy memory p = policies[user];
-        return p.active && block.timestamp <= p.lastPaidAt + CYCLE_DURATION;
+        return p.active && block.timestamp <= p.lastPaidAt + premiumDuration;
     }
 
-    function transferRevenue() external {
-        require(
-            block.timestamp >= lastRevenueTransfer + CYCLE_DURATION,
-            "Too early"
-        );
-
+    function transferRevenue() external onlyOwner {
         uint256 balance = usdc.balanceOf(address(this));
         require(balance > 0, "No revenue");
 
+        uint256 jagaStakeAllocation = (30 * balance) / 100;
+        uint256 ownerAllocation = (20 * balance) / 100;
+        uint256 claimManagerAllocation = (25 * balance) / 100;
+
         lastRevenueTransfer = block.timestamp;
-        usdc.approve(revenueReceiver, balance);
-        IClaimManager(revenueReceiver).receiveRevenue(balance);
+        usdc.transfer(address(jagaStakeContract), jagaStakeAllocation);
+        usdc.transfer(address(owner), ownerAllocation);
+        usdc.transfer(address(claimManagerContract), claimManagerAllocation);
+        usdc.transfer(address(InvestmentManagerContract), balance);
 
-        emit RevenueTransferred(revenueReceiver, balance);
-    }
-
-    function setClaimManager(address _claimManager) external onlyOwner {
-        revenueReceiver = _claimManager;
+        emit RevenueTransferred(balance);
     }
 }
