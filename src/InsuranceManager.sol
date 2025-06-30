@@ -30,7 +30,7 @@ contract InsuranceManager {
 
     uint256 public totalCollected;
 
-    event PremiumPaid(address indexed user, uint256 amount);
+    event PremiumPaid(address indexed user, uint256 indexed amount);
     event RevenueTransferred(uint256 indexed amount);
 
     modifier onlyOwner() {

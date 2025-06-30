@@ -25,11 +25,10 @@ contract ClaimManager {
 
     mapping(uint256 => bool) public claimExecuted;
 
-    event RevenueReceived(uint256 amount);
     event ClaimPaid(
         uint256 indexed claimId,
         address indexed to,
-        uint256 amount
+        uint256 indexed amount
     );
 
     modifier onlyDAO() {

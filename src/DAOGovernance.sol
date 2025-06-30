@@ -44,13 +44,13 @@ contract DAOGovernance {
     event ClaimSubmitted(
         uint256 indexed claimId,
         address indexed claimant,
-        uint256 amount
+        uint256 indexed amount
     );
     event Voted(
         uint256 indexed claimId,
-        address voter,
-        bool approve,
-        uint256 weight
+        address indexed voter,
+        bool indexed approve,
+        uint256 indexed weight
     );
     event ClaimApproved(uint256 indexed claimId);
     event ClaimRejected(uint256 indexed claimId);
