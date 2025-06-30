@@ -31,10 +31,14 @@ contract JagaStake {
     mapping(uint256 => mapping(address => uint256)) public sessionStake;
     mapping(uint256 => mapping(address => bool)) public claimed;
 
-    event Staked(address indexed user, uint256 amount);
-    event Unstaked(address indexed user, uint256 amount);
-    event Claimed(address indexed user, uint256 session, uint256 reward);
-    event RevenueAdded(uint256 session, uint256 amount);
+    event Staked(address indexed user, uint256 indexed amount);
+    event Unstaked(address indexed user, uint256 indexed amount);
+    event Claimed(
+        address indexed user,
+        uint256 indexed session,
+        uint256 indexed reward
+    );
+    event RevenueAdded(uint256 indexed session, uint256 indexed amount);
 
     constructor(address _usdc) {
         usdc = IERC20(_usdc);
@@ -120,6 +124,10 @@ contract JagaStake {
     }
 
     function claim(uint256 sessionId) external updateSession {
+        require(
+            sessions[sessionId].totalReward > 0,
+            "There are no revenue to be shared"
+        );
         require(sessions[sessionId].finalized, "Not finalized");
         require(!claimed[sessionId][msg.sender], "Already claimed");
 
