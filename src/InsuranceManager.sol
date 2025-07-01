@@ -109,7 +109,10 @@ contract InsuranceManager {
         usdc.transfer(address(owner), ownerAllocation);
         usdc.transfer(address(claimManagerContract), claimManagerAllocation);
         // last transfer use balance left to avoid any precision loss from the calculation
-        usdc.transfer(address(investmentManagerContract), balance);
+        usdc.transfer(
+            address(investmentManagerContract),
+            usdc.balanceOf(address(this))
+        );
 
         emit RevenueTransferred(balance);
     }
