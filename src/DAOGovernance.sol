@@ -149,6 +149,7 @@ contract DAOGovernance {
 
     /**
      * @notice Executes the vote result after voting period or once quorum is met
+     * @dev Proposal must be live for atleast 5 days for it to be executed
      * @param claimId The ID of the claim to finalize
      * @return yesRatio The ratio of approved votes to total votes
      */
