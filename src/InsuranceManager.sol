@@ -117,6 +117,10 @@ contract InsuranceManager {
         emit RevenueTransferred(balance);
     }
 
+    function setApproval(uint256 amount) external onlyOwner {
+        usdc.approve(address(jagaStakeContract), amount);
+    }
+
     /**
      * @notice Sets the configuration for JagaStake, ClaimManager and InvestmentManager contracts.
      * @dev Only callable by the contract owner.
