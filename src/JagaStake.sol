@@ -133,7 +133,10 @@ contract JagaStake {
      * @param sessionId ID of the session to reward
      * @param amount Revenue amount to add
      */
-    function addRevenue(uint256 sessionId, uint256 amount) external {
+    function addRevenue(
+        uint256 sessionId,
+        uint256 amount
+    ) external updateSession {
         require(msg.sender == insuranceManager, "You're not allowed!");
         require(sessionId < sessionCounter, "Can only reward past sessions");
         require(!sessions[sessionId].finalized, "Already finalized");
