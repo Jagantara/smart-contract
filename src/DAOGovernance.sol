@@ -55,8 +55,17 @@ contract DAOGovernance {
     // Mapping of claim ID to its claimant
     mapping(uint256 => address) public claimOwner;
 
-    event ClaimSubmitted(uint256 indexed claimId, address indexed claimant, uint256 indexed amount);
-    event Voted(uint256 indexed claimId, address indexed voter, bool indexed approve, uint256 weight);
+    event ClaimSubmitted(
+        uint256 indexed claimId,
+        address indexed claimant,
+        uint256 indexed amount
+    );
+    event Voted(
+        uint256 indexed claimId,
+        address indexed voter,
+        bool indexed approve,
+        uint256 weight
+    );
     event ClaimApproved(uint256 indexed claimId);
     event ClaimRejected(uint256 indexed claimId);
 
@@ -85,8 +94,14 @@ contract DAOGovernance {
      * @param amount Requested payout amount
      * @return claimId The ID of the newly created claim
      */
-    function submitClaim(string calldata reason, uint256 amount) external returns (uint256) {
-        require(IInsuranceManager(insuranceManager).isActive(msg.sender), "Invalid User");
+    function submitClaim(
+        string calldata reason,
+        uint256 amount
+    ) external returns (uint256) {
+        require(
+            IInsuranceManager(insuranceManager).isActive(msg.sender),
+            "Invalid User"
+        );
         uint256 id = claimCounter++;
 
         ClaimProposal storage proposal = _claims[id];
@@ -110,7 +125,10 @@ contract DAOGovernance {
     function vote(uint256 claimId, bool approve) external {
         ClaimProposal storage proposal = _claims[claimId];
         require(proposal.status == ClaimStatus.Pending, "Voting closed");
-        require(block.timestamp <= proposal.createdAt + VOTING_PERIOD, "Voting expired");
+        require(
+            block.timestamp <= proposal.createdAt + VOTING_PERIOD,
+            "Voting expired"
+        );
 
         VoteType prev = proposal.votes[msg.sender];
         require(prev == VoteType.Null, "Already voted");
@@ -140,8 +158,11 @@ contract DAOGovernance {
 
         uint256 totalVotes = proposal.yesVotes + proposal.noVotes;
 
-        // checks if the proposal has been live for more than 7 days
-        if (block.timestamp > proposal.createdAt + VOTING_PERIOD) {
+        // checks if the proposal has been live for more than 5 days and less than 7 days
+        if (
+            block.timestamp < proposal.createdAt + 5 days &&
+            block.timestamp > proposal.createdAt + VOTING_PERIOD
+        ) {
             proposal.status = ClaimStatus.Rejected;
             emit ClaimRejected(claimId);
             return 0;
@@ -175,12 +196,16 @@ contract DAOGovernance {
      * @return amount Amount requested
      * @return approvedAt Timestamp of approval
      */
-    function getClaimData(uint256 claimId) external view returns (address, uint256, uint256) {
+    function getClaimData(
+        uint256 claimId
+    ) external view returns (address, uint256, uint256) {
         ClaimProposal storage proposal = _claims[claimId];
         return (proposal.claimant, proposal.amount, proposal.approvedAt);
     }
 
-    function getClaimStatus(uint256 claimId) external view returns (ClaimStatus) {
+    function getClaimStatus(
+        uint256 claimId
+    ) external view returns (ClaimStatus) {
         return _claims[claimId].status;
     }
 
@@ -190,7 +215,10 @@ contract DAOGovernance {
      * @param _jagaToken The address of the Jaga token contract.
      * @param _insuranceManager The address of the insuranceManager contract.
      */
-    function setConfig(address _jagaToken, address _insuranceManager) external onlyOwner {
+    function setConfig(
+        address _jagaToken,
+        address _insuranceManager
+    ) external onlyOwner {
         jagaToken = IERC20(_jagaToken);
         insuranceManager = _insuranceManager;
     }
