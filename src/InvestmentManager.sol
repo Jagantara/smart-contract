@@ -9,6 +9,11 @@ interface IJagaStake {
     function claim(uint256 sessionId) external;
 }
 
+/**
+ * @title InvestmentManagerVault
+ * @notice Manages staking USDC into JagaStake and allows owner to withdraw or interact with other contracts
+ * @dev Only the owner can perform staking, unstaking, revenue claiming, and arbitrary contract calls
+ */
 contract InvestmentManagerVault {
     address public owner;
     address public jagaStakeAddress;
@@ -27,56 +32,83 @@ contract InvestmentManagerVault {
         usdc = IERC20(_usdc);
     }
 
-    // Owner-controlled withdrawal (for DAO use or rebalancing)
+    /**
+     * @notice Withdraws USDC from the vault to a specific address (for rebalancing)
+     * @dev Only callable by owner
+     * @param to The destination address for the withdrawn funds
+     * @param amount The amount of USDC to withdraw
+     */
     function withdraw(address to, uint256 amount) external onlyOwner {
         require(usdc.transfer(to, amount), "Withdraw failed");
         emit Withdrawn(to, amount);
     }
 
+    /**
+     * @notice Stakes the entire USDC balance in the vault into the JagaStake contract
+     * @dev Only callable by owner. Updates `totalStaked`.
+     */
     function stake() external onlyOwner {
         uint256 usdcBalance = vaultBalance();
         totalStaked += usdcBalance;
         IJagaStake(jagaStakeAddress).stake(usdcBalance);
     }
 
+    /**
+     * @notice Unstakes a specific amount of USDC from JagaStake
+     * @dev Only callable by owner. Decreases `totalStaked`.
+     * @param amount The amount of USDC to unstake
+     */
     function unstake(uint256 amount) external onlyOwner {
         totalStaked -= amount;
         IJagaStake(jagaStakeAddress).unstake(amount);
     }
 
+    /**
+     * @notice Claims rewards from JagaStake for a specific session
+     * @dev Only callable by owner
+     * @param sessionId The session ID to claim rewards from
+     */
     function claim(uint256 sessionId) external onlyOwner {
         IJagaStake(jagaStakeAddress).claim(sessionId);
     }
 
-    /// @notice Call any function with custom params
-    /// @param target Address of the contract to call
-    /// @param funcSignature The function signature (e.g. "foo(uint256,address)")
-    /// @param params Encoded parameters (use abi.encode(...) externally)
-    function callFunction(
-        address target,
-        string calldata funcSignature,
-        bytes calldata params
-    ) external onlyOwner returns (bool success, bytes memory result) {
-        // Build function selector from string
-        bytes4 selector = bytes4(keccak256(bytes(funcSignature)));
+    // /**
+    //  * @notice Calls any external contract with custom function signature and encoded parameters to support dynamic change of asset allocation to be restaked
+    //  * @dev Only callable by owner.
+    //  */
+    // function callFunction(address target, string calldata funcSignature, bytes calldata params)
+    //     external
+    //     onlyOwner
+    //     returns (bool success, bytes memory result)
+    // {
+    //     // Build function selector from string
+    //     bytes4 selector = bytes4(keccak256(bytes(funcSignature)));
 
-        // Merge selector and encoded params
-        bytes memory data = abi.encodePacked(selector, params);
+    //     // Merge selector and encoded params
+    //     bytes memory data = abi.encodePacked(selector, params);
 
-        // Call the target contract
-        (success, result) = target.call(data);
-        require(success, "Transaction Failed");
-    }
+    //     // Call the target contract
+    //     (success, result) = target.call(data);
+    //     require(success, "Transaction Failed");
+    // }
 
-    // View current balance
     function vaultBalance() public view returns (uint256) {
         return usdc.balanceOf(address(this));
     }
 
+    /**
+     * @notice Returns the total amount of USDC that has been staked
+     * @return The total amount currently marked as staked
+     */
     function getAmountStaked() public view returns (uint256) {
         return totalStaked;
     }
 
+    /**
+     * @notice Sets the configuration for JagaStake contracts.
+     * @dev Only callable by the contract owner.
+     * @param _jagaStake The address of the Jaga stake contract.
+     */
     function setConfig(address _jagaStake) external onlyOwner {
         jagaStakeAddress = _jagaStake;
     }
