@@ -7,18 +7,27 @@ interface IInsuranceManager {
     function isActive(address user) external view returns (bool);
 }
 
+/**
+ * @title DAOGovernance
+ * @notice DAO-based voting system for approving insurance claim proposals
+ * @dev Token-weighted voting system using JagaToken with a 7-day voting period and 66% approval threshold
+ */
 contract DAOGovernance {
+    // Types of votes a participant can cast
     enum VoteType {
         Null,
         Yes,
         No
     }
+
+    // Status of the claim proposal
     enum ClaimStatus {
         Pending,
         Approved,
         Rejected
     }
 
+    // Structure of a claim proposal
     struct ClaimProposal {
         address claimant;
         string reason;
@@ -31,30 +40,29 @@ contract DAOGovernance {
         mapping(address => VoteType) votes;
     }
 
+    // JAGA token used for voting
     IERC20 public jagaToken;
     uint256 public constant VOTING_PERIOD = 7 days;
-    uint256 public constant THRESHOLD = 66; // 66% = 2/3
+    // 66% = 2/3 minimum threshold for approved claim
+    uint256 public constant THRESHOLD = 66;
     address public insuranceManager;
     address public owner;
 
+    // Counter for generating unique claim IDs
     uint256 public claimCounter;
+    // Internal mapping of claim ID to ClaimProposal
     mapping(uint256 => ClaimProposal) private _claims;
+    // Mapping of claim ID to its claimant
     mapping(uint256 => address) public claimOwner;
 
-    event ClaimSubmitted(
-        uint256 indexed claimId,
-        address indexed claimant,
-        uint256 indexed amount
-    );
-    event Voted(
-        uint256 indexed claimId,
-        address indexed voter,
-        bool indexed approve,
-        uint256 weight
-    );
+    event ClaimSubmitted(uint256 indexed claimId, address indexed claimant, uint256 indexed amount);
+    event Voted(uint256 indexed claimId, address indexed voter, bool indexed approve, uint256 weight);
     event ClaimApproved(uint256 indexed claimId);
     event ClaimRejected(uint256 indexed claimId);
 
+    /**
+     * @notice Initializes the DAO governance contract
+     */
     constructor(address _jagaToken, address _insuranceManager) {
         jagaToken = IERC20(_jagaToken);
         insuranceManager = _insuranceManager;
@@ -71,14 +79,14 @@ contract DAOGovernance {
         _;
     }
 
-    function submitClaim(
-        string calldata reason,
-        uint256 amount
-    ) external returns (uint256) {
-        require(
-            IInsuranceManager(insuranceManager).isActive(msg.sender),
-            "Invalid User"
-        );
+    /**
+     * @notice Submits a new claim for DAO voting
+     * @param reason Reason for the claim
+     * @param amount Requested payout amount
+     * @return claimId The ID of the newly created claim
+     */
+    function submitClaim(string calldata reason, uint256 amount) external returns (uint256) {
+        require(IInsuranceManager(insuranceManager).isActive(msg.sender), "Invalid User");
         uint256 id = claimCounter++;
 
         ClaimProposal storage proposal = _claims[id];
@@ -94,13 +102,15 @@ contract DAOGovernance {
         return id;
     }
 
+    /**
+     * @notice Vote on a claim proposal using JagaToken weight
+     * @param claimId The ID of the claim to vote on
+     * @param approve Whether to vote yes (`true`) or no (`false`)
+     */
     function vote(uint256 claimId, bool approve) external {
         ClaimProposal storage proposal = _claims[claimId];
         require(proposal.status == ClaimStatus.Pending, "Voting closed");
-        require(
-            block.timestamp <= proposal.createdAt + VOTING_PERIOD,
-            "Voting expired"
-        );
+        require(block.timestamp <= proposal.createdAt + VOTING_PERIOD, "Voting expired");
 
         VoteType prev = proposal.votes[msg.sender];
         require(prev == VoteType.Null, "Already voted");
@@ -119,27 +129,35 @@ contract DAOGovernance {
         emit Voted(claimId, msg.sender, approve, weight);
     }
 
-    function executeVote(uint256 claimId) external {
-        ClaimProposal storage p = _claims[claimId];
-        require(p.status == ClaimStatus.Pending, "Already executed");
-        require(block.timestamp > p.createdAt, "Too early");
+    /**
+     * @notice Executes the vote result after voting period or once quorum is met
+     * @param claimId The ID of the claim to finalize
+     * @return yesRatio The ratio of approved votes to total votes
+     */
+    function executeVote(uint256 claimId) external returns (uint256 yesRatio) {
+        ClaimProposal storage proposal = _claims[claimId];
+        require(proposal.status == ClaimStatus.Pending, "Already executed");
 
-        uint256 totalVotes = p.yesVotes + p.noVotes;
-        if (block.timestamp > p.createdAt + VOTING_PERIOD) {
-            p.status = ClaimStatus.Rejected;
+        uint256 totalVotes = proposal.yesVotes + proposal.noVotes;
+
+        // checks if the proposal has been live for more than 7 days
+        if (block.timestamp > proposal.createdAt + VOTING_PERIOD) {
+            proposal.status = ClaimStatus.Rejected;
             emit ClaimRejected(claimId);
-            return;
+            return 0;
         }
-
         if (totalVotes == 0) revert("No participation");
 
-        uint256 yesRatio = (p.yesVotes * 100) / totalVotes;
+        // The ratio of approved votes to total votes
+        yesRatio = (proposal.yesVotes * 100) / totalVotes;
         if (yesRatio >= THRESHOLD) {
-            p.status = ClaimStatus.Approved;
-            p.approvedAt = block.timestamp;
+            // Change the status to approved
+            proposal.status = ClaimStatus.Approved;
+            proposal.approvedAt = block.timestamp;
             emit ClaimApproved(claimId);
         } else {
-            p.status = ClaimStatus.Rejected;
+            // Change the status to rejected
+            proposal.status = ClaimStatus.Rejected;
             emit ClaimRejected(claimId);
         }
     }
@@ -150,23 +168,29 @@ contract DAOGovernance {
         return _claims[claimId].status == ClaimStatus.Approved;
     }
 
-    function getClaimData(
-        uint256 claimId
-    ) external view returns (address, uint256, uint256) {
+    /**
+     * @notice Get claim data needed for payout
+     * @param claimId The ID of the claim
+     * @return claimant Address of claimant
+     * @return amount Amount requested
+     * @return approvedAt Timestamp of approval
+     */
+    function getClaimData(uint256 claimId) external view returns (address, uint256, uint256) {
         ClaimProposal storage proposal = _claims[claimId];
         return (proposal.claimant, proposal.amount, proposal.approvedAt);
     }
 
-    function getClaimStatus(
-        uint256 claimId
-    ) external view returns (ClaimStatus) {
+    function getClaimStatus(uint256 claimId) external view returns (ClaimStatus) {
         return _claims[claimId].status;
     }
 
-    function setConfig(
-        address _jagaToken,
-        address _insuranceManager
-    ) external onlyOwner {
+    /**
+     * @notice Sets the configuration for Jaga token and insuranceManager contracts.
+     * @dev Only callable by the contract owner.
+     * @param _jagaToken The address of the Jaga token contract.
+     * @param _insuranceManager The address of the insuranceManager contract.
+     */
+    function setConfig(address _jagaToken, address _insuranceManager) external onlyOwner {
         jagaToken = IERC20(_jagaToken);
         insuranceManager = _insuranceManager;
     }
