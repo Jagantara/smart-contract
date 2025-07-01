@@ -72,26 +72,6 @@ contract InvestmentManagerVault {
         IJagaStake(jagaStakeAddress).claim(sessionId);
     }
 
-    // /**
-    //  * @notice Calls any external contract with custom function signature and encoded parameters to support dynamic change of asset allocation to be restaked
-    //  * @dev Only callable by owner.
-    //  */
-    // function callFunction(address target, string calldata funcSignature, bytes calldata params)
-    //     external
-    //     onlyOwner
-    //     returns (bool success, bytes memory result)
-    // {
-    //     // Build function selector from string
-    //     bytes4 selector = bytes4(keccak256(bytes(funcSignature)));
-
-    //     // Merge selector and encoded params
-    //     bytes memory data = abi.encodePacked(selector, params);
-
-    //     // Call the target contract
-    //     (success, result) = target.call(data);
-    //     require(success, "Transaction Failed");
-    // }
-
     function vaultBalance() public view returns (uint256) {
         return usdc.balanceOf(address(this));
     }
