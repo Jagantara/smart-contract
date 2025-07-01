@@ -1,10 +1,10 @@
-# Jagantara
+# Jagantara 🛡️
 
 Jagantara is a decentralized insurance platform that gives people a fair and transparent way to protect themselves from unexpected losses. Instead of relying on a traditional insurance company, users pay a regular premium directly into a smart contract. When something happens and a user needs to make a claim, the community of token holders—through a decentralized autonomous organization (DAO) reviews and votes on whether the claim should be approved.
 
-Jagantara doesn't just protect claimants; it also rewards users who help secure the system. Anyone can stake stablecoins like USDC in the protocol to support its financial health. In return, they receive a token called JagaToken, which gives them the right to vote on claims and earn a share of the protocol's revenue.
+Jagantara doesn't just protect claimants; it also rewards users who help secure the system. Anyone can stake stablecoins like USDC in the protocol to support its financial health. In return, they receive a token called JagaToken, which gives them the right to vote on claims and earn a share of the protocol's revenue. This creates a balanced ecosystem where claimants, voters, and stakers all play important roles. The system is governed entirely by code, with no centralized authority, making it transparent, secure, and community-driven from end to end.
 
-This creates a balanced ecosystem where claimants, voters, and stakers all play important roles. The system is governed entirely by code, with no centralized authority, making it transparent, secure, and community-driven from end to end.
+## Contracts
 
 | Contract                     | Description                                                                     |
 | ---------------------------- | ------------------------------------------------------------------------------- |
@@ -14,6 +14,8 @@ This creates a balanced ecosystem where claimants, voters, and stakers all play 
 | `JagaStake.sol`              | Enables USDC staking and distributes session-based rewards.                     |
 | `InvestmentManagerVault.sol` | Handles revenue reinvestment and allows owner-directed operations.              |
 | `JagaToken.sol`              | ERC20 token minted/burned during stake/unstake; used for governance voting.     |
+
+## Flow Chart
 
 ![Diagram](./images/diagram.png)
 
