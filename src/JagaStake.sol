@@ -98,6 +98,7 @@ contract JagaStake {
         sessions[sessionCounter + 1].totalStaked += amount;
         sessionStake[sessionCounter + 1][msg.sender] += amount;
 
+        // user stake their money and the JagaToken minted
         require(
             usdc.transferFrom(msg.sender, address(this), amount),
             "Transfer failed"
@@ -119,8 +120,9 @@ contract JagaStake {
         sessions[sessionCounter].totalStaked -= amount;
         sessionStake[sessionCounter][msg.sender] -= amount;
 
+        // user received their staked money and the JagaToken burned
         require(usdc.transfer(msg.sender, amount), "Transfer failed");
-        IJagaToken(address(jagaToken)).mint(msg.sender, amount);
+        IJagaToken(address(jagaToken)).burn(msg.sender, amount);
 
         emit Unstaked(msg.sender, amount);
     }
