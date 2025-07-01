@@ -148,7 +148,7 @@ contract JagaStake {
         return sessionStart + SESSION_DURATION;
     }
 
-    function timeLeft() external view updateSession returns (uint256) {
+    function timeLeft() external updateSession returns (uint256) {
         return SESSION_DURATION - (sessionStart + block.timestamp);
     }
 
