@@ -3,11 +3,7 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-interface IJagaStake {
-    function stake(uint256 amount) external;
-    function unstake(uint256 amount) external;
-    function claim(uint256 sessionId) external;
-}
+import {IJagaStake} from "./interfaces/IJagaStake.sol";
 
 /**
  * @title InvestmentManagerVault

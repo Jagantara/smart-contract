@@ -5,15 +5,15 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IDAOGovernance {
     function isClaimApproved(uint256 claimId) external view returns (bool);
-    function getClaimData(uint256 claimId)
+    function getClaimData(
+        uint256 claimId
+    )
         external
         view
         returns (address claimant, uint256 amount, uint256 approvedAt);
 }
 
-interface IJagaStake {
-    function withdraw(uint256 amount) external;
-}
+import {IJagaStake} from "./interfaces/IJagaStake.sol";
 
 /**
  * @title ClaimManager
@@ -29,7 +29,11 @@ contract ClaimManager {
     /// @notice Tracks if a claim has already been paid
     mapping(uint256 => bool) public claimExecuted;
 
-    event ClaimPaid(uint256 indexed claimId, address indexed to, uint256 indexed amount);
+    event ClaimPaid(
+        uint256 indexed claimId,
+        address indexed to,
+        uint256 indexed amount
+    );
 
     modifier onlyDAO() {
         require(msg.sender == daoGovernance, "Only DAO");
@@ -54,15 +58,21 @@ contract ClaimManager {
     function claimPayout(uint256 claimId) external {
         require(!claimExecuted[claimId], "Already paid");
 
-        (address claimant, uint256 amount, uint256 approvedAt) = IDAOGovernance(daoGovernance).getClaimData(claimId);
+        (address claimant, uint256 amount, uint256 approvedAt) = IDAOGovernance(
+            daoGovernance
+        ).getClaimData(claimId);
 
         require(claimant == msg.sender, "Not claimant");
-        require(IDAOGovernance(daoGovernance).isClaimApproved(claimId), "Not approved");
+        require(
+            IDAOGovernance(daoGovernance).isClaimApproved(claimId),
+            "Not approved"
+        );
         require(block.timestamp <= approvedAt + 7 days, "Claim expired");
 
         // Pull missing funds from the staking contract if necessary
         if (amount > IERC20(usdc).balanceOf(address(this))) {
-            uint256 amountRequired = amount - IERC20(usdc).balanceOf(address(this));
+            uint256 amountRequired = amount -
+                IERC20(usdc).balanceOf(address(this));
             IJagaStake(jagaStake).withdraw(amountRequired);
         }
 
@@ -86,7 +96,10 @@ contract ClaimManager {
      * @param _daoGovernance The address of the DAO governance contract.
      * @param _jagaStake The address of the JagaStake staking contract.
      */
-    function setConfig(address _daoGovernance, address _jagaStake) external onlyOwner {
+    function setConfig(
+        address _daoGovernance,
+        address _jagaStake
+    ) external onlyOwner {
         daoGovernance = _daoGovernance;
         jagaStake = _jagaStake;
     }

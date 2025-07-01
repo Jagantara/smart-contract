@@ -7,9 +7,7 @@ interface IClaimManager {
     function receiveRevenue(uint256 amount) external;
 }
 
-interface IJagaStake {
-    function addRevenue(uint256 sessionId, uint256 amount) external;
-}
+import {IJagaStake} from "./interfaces/IJagaStake.sol";
 
 /**
  * @title InsuranceManager
