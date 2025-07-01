@@ -30,6 +30,7 @@ contract InsuranceManager {
 
     struct Policy {
         uint256 lastPaidAt;
+        uint256 duration;
         bool active;
     }
 
@@ -57,25 +58,36 @@ contract InsuranceManager {
     }
 
     /**
-     * @notice Allows a user to pay their insurance premium
+     * @notice Allows a user to pay their insurance premium based on the duration
      * @dev Transfers USDC from the user to the contract, marks their policy as active
+     * @param duration The duration amount of insurance activation
      */
-    function payPremium() external {
-        require(
-            usdc.transferFrom(msg.sender, address(this), premiumPrice),
-            "Transfer failed"
-        );
-
+    function payPremium(uint256 duration) external {
+        // update the policy state
         policies[msg.sender].lastPaidAt = block.timestamp;
         policies[msg.sender].active = true;
+        policies[msg.sender].duration = duration;
         totalCollected += premiumPrice;
+
+        uint256 price = premiumPrice * duration;
+        require(
+            usdc.transferFrom(msg.sender, address(this), price),
+            "Transfer failed"
+        );
 
         emit PremiumPaid(msg.sender, premiumPrice);
     }
 
+    /**
+     * @notice Checks if a user's policy is currently active
+     * @param user The address of the user to check
+     * @return True if the policy is active and not expired, false otherwise
+     */
     function isActive(address user) external view returns (bool) {
         Policy memory p = policies[user];
-        return p.active && block.timestamp <= p.lastPaidAt + premiumDuration;
+        return
+            p.active &&
+            block.timestamp <= p.lastPaidAt + (premiumDuration * p.duration);
     }
 
     /**
