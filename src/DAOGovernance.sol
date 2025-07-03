@@ -30,6 +30,7 @@ contract DAOGovernance {
     // Structure of a claim proposal
     struct ClaimProposal {
         address claimant;
+        string title;
         string reason;
         uint256 amount;
         uint256 createdAt;
@@ -60,6 +61,7 @@ contract DAOGovernance {
         address indexed claimant,
         uint256 indexed amount
     );
+    event ClaimDisplay(string indexed title, string indexed reason);
     event Voted(
         uint256 indexed claimId,
         address indexed voter,
@@ -91,11 +93,13 @@ contract DAOGovernance {
     /**
      * @notice Submits a new claim for DAO voting
      * @param reason Reason for the claim
+     * @param title Title for the claim
      * @param amount Requested payout amount
      * @return claimId The ID of the newly created claim
      */
     function submitClaim(
         string calldata reason,
+        string calldata title,
         uint256 amount
     ) external returns (uint256) {
         require(
@@ -106,6 +110,7 @@ contract DAOGovernance {
 
         ClaimProposal storage proposal = _claims[id];
         proposal.claimant = msg.sender;
+        proposal.title = title;
         proposal.reason = reason;
         proposal.amount = amount;
         proposal.createdAt = block.timestamp;
@@ -114,6 +119,7 @@ contract DAOGovernance {
         claimOwner[id] = msg.sender;
 
         emit ClaimSubmitted(id, msg.sender, amount);
+        emit ClaimDisplay(proposal.title, proposal.reason);
         return id;
     }
 
