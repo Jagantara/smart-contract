@@ -6,14 +6,14 @@ Jagantara doesn't just protect claimants; it also rewards users who help secure 
 
 ## Contracts
 
-| Contract                     | Description                                                                     |
-| ---------------------------- | ------------------------------------------------------------------------------- |
-| `InsuranceManager.sol`       | Accepts premium payments, manages policy states, and distributes funds monthly. |
-| `DAOGovernance.sol`          | DAO that governs claims through token-weighted voting.                          |
-| `ClaimManager.sol`           | Executes payouts for approved claims.                                           |
-| `JagaStake.sol`              | Enables USDC staking and distributes session-based rewards.                     |
-| `InvestmentManagerVault.sol` | Handles revenue reinvestment and allows owner-directed operations.              |
-| `JagaToken.sol`              | ERC20 token minted/burned during stake/unstake; used for governance voting.     |
+| Contract                | Description                                                                     |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| `InsuranceManager.sol`  | Accepts premium payments, manages policy states, and distributes funds monthly. |
+| `DAOGovernance.sol`     | DAO that governs claims through token-weighted voting.                          |
+| `ClaimManager.sol`      | Executes payouts for approved claims.                                           |
+| `JagaStake.sol`         | Enables USDC staking and distributes session-based rewards.                     |
+| `InvestmentManager.sol` | Handles revenue reinvestment and allows owner-directed operations.              |
+| `JagaToken.sol`         | ERC20 token minted/burned during stake/unstake; used for governance voting.     |
 
 ## Flow Chart
 
@@ -28,7 +28,7 @@ Jagantara doesn't just protect claimants; it also rewards users who help secure 
 - 25% → ClaimManager (Payout Vault)
 - 30% → JagaStake (Staking Rewards)
 - 20% → Owner
-- 25% → InvestmentManagerVault (Reinvestment)
+- 25% → InvestmentManager (Reinvestment)
 
 ## Claiming Flow
 

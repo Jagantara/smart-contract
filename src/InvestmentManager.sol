@@ -6,11 +6,11 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IJagaStake} from "./interfaces/IJagaStake.sol";
 
 /**
- * @title InvestmentManagerVault
+ * @title InvestmentManager
  * @notice Manages staking USDC into JagaStake and allows owner to withdraw or interact with other contracts
  * @dev Only the owner can perform staking, unstaking, revenue claiming, and arbitrary contract calls
  */
-contract InvestmentManagerVault {
+contract InvestmentManager {
     address public owner;
     address public jagaStakeAddress;
     IERC20 public immutable usdc;
