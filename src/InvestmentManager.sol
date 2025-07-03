@@ -13,6 +13,7 @@ import {IJagaStake} from "./interfaces/IJagaStake.sol";
 contract InvestmentManager {
     address public owner;
     address public jagaStakeAddress;
+    address private unusedOwner;
     IERC20 public immutable usdc;
     uint256 totalStaked;
 
@@ -24,7 +25,8 @@ contract InvestmentManager {
     }
 
     constructor(address _owner, address _usdc) {
-        owner = _owner;
+        unusedOwner = _owner;
+        owner = msg.sender;
         usdc = IERC20(_usdc);
     }
 
