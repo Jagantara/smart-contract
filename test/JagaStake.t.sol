@@ -57,6 +57,28 @@ contract JagaStakeTest is Test {
         vm.stopPrank();
     }
 
+    function testClaimReward() public {
+        vm.startPrank(user);
+        usdc.approve(address(jagaStake), 1000e6);
+        jagaStake.stake(1000e6);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 62 days);
+
+        vm.startPrank(owner);
+        usdc.mint(address(insuranceManager), 100e6);
+        insuranceManager.setApproval(100e6);
+        insuranceManager.transferRevenue(1);
+        vm.stopPrank();
+
+        assertEq(jagaStake.timeLeft(), 2419200); // 28 days left
+
+        assertEq(jagaStake.pendingReward(user, 1), 30e6);
+        vm.startPrank(user);
+        jagaStake.claim(1);
+        assertEq(usdc.balanceOf(user), 30e6); // 30% of the revenue
+    }
+
     function testRevertDoubleClaim() public {
         vm.startPrank(user);
         usdc.approve(address(jagaStake), 1000e6);

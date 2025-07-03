@@ -66,6 +66,7 @@ contract ClaimManagerTest is Test {
         // Fund ClaimManager
         vm.prank(owner);
         usdc.mint(address(claimManager), 100e6);
+        assertEq(claimManager.vaultBalance(), 100e6);
 
         // Claim payout
         vm.prank(user);
