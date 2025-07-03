@@ -159,11 +159,13 @@ contract DAOGovernance {
 
         uint256 totalVotes = proposal.yesVotes + proposal.noVotes;
 
-        // checks if the proposal has been live for more than 5 days and less than 7 days
-        if (
-            block.timestamp < proposal.createdAt + 5 days &&
-            block.timestamp > proposal.createdAt + VOTING_PERIOD
-        ) {
+        // checks if the proposal has been live for more than 5 days
+        if (block.timestamp < proposal.createdAt + 5 days) {
+            revert("Vote is allowed to be executed after 5 days");
+        }
+
+        // checks if the proposal has been live for less than 7 days
+        if (block.timestamp > proposal.createdAt + VOTING_PERIOD) {
             proposal.status = ClaimStatus.Rejected;
             emit ClaimRejected(claimId);
             return 0;
