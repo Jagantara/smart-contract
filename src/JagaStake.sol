@@ -72,12 +72,6 @@ contract JagaStake {
         if (elapsed >= SESSION_DURATION) {
             uint256 sessionsPassed = elapsed / SESSION_DURATION;
 
-            for (uint256 i = 1; i <= sessionsPassed; i++) {
-                uint256 newSession = sessionCounter + i;
-                sessions[newSession].totalStaked = sessions[sessionCounter]
-                    .totalStaked;
-            }
-
             sessionStart += sessionsPassed * SESSION_DURATION;
             sessionCounter += sessionsPassed;
         }
@@ -200,11 +194,15 @@ contract JagaStake {
      * @dev Automatically updates session if needed
      */
     function timeLeft() external updateSession returns (uint256) {
-        return SESSION_DURATION - (sessionStart + block.timestamp);
+        uint256 elapsed = block.timestamp - sessionStart;
+        if (elapsed >= SESSION_DURATION) {
+            return 0;
+        }
+        return SESSION_DURATION - elapsed;
     }
 
-    function getJagaToken() external view returns (address) {
-        return address(jagaToken);
+    function getJagaToken() external view returns (JagaToken) {
+        return jagaToken;
     }
 
     /**

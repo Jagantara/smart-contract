@@ -32,6 +32,7 @@ contract DAOGovernance {
         address claimant;
         string title;
         string reason;
+        string claimType;
         uint256 amount;
         uint256 createdAt;
         uint256 yesVotes;
@@ -61,7 +62,11 @@ contract DAOGovernance {
         address indexed claimant,
         uint256 indexed amount
     );
-    event ClaimDisplay(string indexed title, string indexed reason);
+    event ClaimDisplay(
+        string indexed title,
+        string indexed reason,
+        string indexed claimType
+    );
     event Voted(
         uint256 indexed claimId,
         address indexed voter,
@@ -94,12 +99,14 @@ contract DAOGovernance {
      * @notice Submits a new claim for DAO voting
      * @param reason Reason for the claim
      * @param title Title for the claim
+     * @param claimType Claim Type for the claim
      * @param amount Requested payout amount
      * @return claimId The ID of the newly created claim
      */
     function submitClaim(
         string calldata reason,
         string calldata title,
+        string calldata claimType,
         uint256 amount
     ) external returns (uint256) {
         require(
@@ -112,6 +119,7 @@ contract DAOGovernance {
         proposal.claimant = msg.sender;
         proposal.title = title;
         proposal.reason = reason;
+        proposal.claimType = claimType;
         proposal.amount = amount;
         proposal.createdAt = block.timestamp;
         proposal.status = ClaimStatus.Pending;
@@ -119,7 +127,7 @@ contract DAOGovernance {
         claimOwner[id] = msg.sender;
 
         emit ClaimSubmitted(id, msg.sender, amount);
-        emit ClaimDisplay(proposal.title, proposal.reason);
+        emit ClaimDisplay(proposal.title, proposal.reason, proposal.claimType);
         return id;
     }
 
