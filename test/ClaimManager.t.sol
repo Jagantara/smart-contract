@@ -59,7 +59,7 @@ contract ClaimManagerTest is Test {
         vm.prank(owner);
         dao.vote(claimId, true);
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(block.timestamp + 5 days);
         vm.prank(user);
         dao.executeVote(claimId);
 
@@ -96,7 +96,7 @@ contract ClaimManagerTest is Test {
         vm.prank(owner);
         dao.vote(claimId, true);
 
-        vm.warp(block.timestamp + 1);
+        vm.warp(block.timestamp + 5 days);
         vm.prank(user);
         dao.executeVote(claimId);
 
