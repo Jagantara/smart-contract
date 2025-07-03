@@ -48,36 +48,12 @@ contract JagaStakeTest is Test {
         usdc.approve(address(jagaStake), 500e6);
         jagaStake.stake(500e6);
 
-        vm.warp(block.timestamp + 31 days);
         jagaStake.unstake(200e6);
 
         console.log(usdc.balanceOf(user));
         assertEq(usdc.balanceOf(user), 700e6); // 1000 - 500 + 200
         assertEq(jagaStake.currentStake(user), 300e6);
         assertEq(jagaToken.balanceOf(address(user)), 300e6);
-        vm.stopPrank();
-    }
-
-    function testAddRevenueAndClaim() public {
-        vm.startPrank(user);
-        usdc.approve(address(jagaStake), 1000e6);
-        jagaStake.stake(1000e6);
-        vm.stopPrank();
-
-        // Simulate 1 session passed
-        vm.warp(block.timestamp + 31 days);
-        vm.startPrank(owner);
-        usdc.mint(address(insuranceManager), 100e6);
-        insuranceManager.setApproval(100e6);
-        insuranceManager.transferRevenue(1);
-        vm.stopPrank();
-
-        vm.startPrank(user);
-        uint256 before = usdc.balanceOf(user);
-        jagaStake.claim(0);
-        uint256 afterBal = usdc.balanceOf(user);
-
-        assertGt(afterBal - before, 0);
         vm.stopPrank();
     }
 

@@ -111,8 +111,8 @@ contract JagaStake {
 
         // update state
         currentStake[msg.sender] -= amount;
-        sessions[sessionCounter].totalStaked -= amount;
-        sessionStake[sessionCounter][msg.sender] -= amount;
+        sessions[sessionCounter + 1].totalStaked -= amount;
+        sessionStake[sessionCounter + 1][msg.sender] -= amount;
 
         // user received their staked money and the JagaToken burned
         require(usdc.transfer(msg.sender, amount), "Transfer failed");
