@@ -46,6 +46,7 @@ contract InvestmentManager {
     function stake() external onlyOwner {
         uint256 usdcBalance = vaultBalance();
         totalStaked += usdcBalance;
+        usdc.approve(jagaStakeAddress, usdcBalance);
         IJagaStake(jagaStakeAddress).stake(usdcBalance);
     }
 
