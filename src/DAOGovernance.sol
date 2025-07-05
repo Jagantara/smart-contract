@@ -59,6 +59,7 @@ contract DAOGovernance {
     // JAGA token used for voting
     IERC20 public jagaToken;
     uint256 public constant VOTING_PERIOD = 7 days;
+    uint256 public minimumVotingPeriod = 5 days;
     // 66% = 2/3 minimum threshold for approved claim
     uint256 public constant THRESHOLD = 66;
     address public insuranceManager;
@@ -193,7 +194,7 @@ contract DAOGovernance {
         uint256 totalVotes = proposal.yesVotes + proposal.noVotes;
 
         // checks if the proposal has been live for more than 5 days
-        if (block.timestamp < proposal.createdAt + 5 days) {
+        if (block.timestamp < proposal.createdAt + minimumVotingPeriod) {
             revert("Vote is allowed to be executed after 5 days");
         }
 
@@ -257,5 +258,11 @@ contract DAOGovernance {
     ) external onlyOwner {
         jagaToken = IERC20(_jagaToken);
         insuranceManager = _insuranceManager;
+    }
+
+    function setMinimumVotingPeriod(
+        uint256 _minimumVotingPeriod
+    ) public onlyOwner {
+        minimumVotingPeriod = _minimumVotingPeriod;
     }
 }

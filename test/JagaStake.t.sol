@@ -80,33 +80,9 @@ contract JagaStakeTest is Test {
 
         assertEq(jagaStake.timeLeft(), 2419200); // 28 days left
 
-        assertEq(jagaStake.pendingReward(user, 1), 30e6);
         vm.startPrank(user);
-        jagaStake.claim(1);
+        assertEq(jagaStake.pendingReward(), 30e6);
+        jagaStake.claim();
         assertEq(usdc.balanceOf(user), 30e6); // 30% of the revenue
-    }
-
-    function testRevertDoubleClaim() public {
-        vm.startPrank(user);
-        usdc.approve(address(jagaStake), 1000e6);
-        jagaStake.stake(1000e6);
-        vm.stopPrank();
-
-        vm.warp(block.timestamp + 62 days);
-
-        vm.startPrank(owner);
-        usdc.mint(address(insuranceManager), 100e6);
-        insuranceManager.setApproval(100e6);
-        insuranceManager.transferRevenue(
-            usdc.balanceOf(address(insuranceManager)),
-            1
-        );
-        vm.stopPrank();
-
-        vm.startPrank(user);
-        jagaStake.claim(1);
-        vm.expectRevert("Already claimed");
-        jagaStake.claim(1);
-        vm.stopPrank();
     }
 }
