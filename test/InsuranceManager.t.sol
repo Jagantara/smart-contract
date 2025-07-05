@@ -25,7 +25,13 @@ contract InsuranceManagerTest is Test {
     function setUp() public {
         vm.startPrank(owner);
         usdc = new MockUSDC();
-        insuranceManager = new InsuranceManager(address(usdc), 100e6, 30 days);
+        insuranceManager = new InsuranceManager(
+            address(usdc),
+            65e6,
+            145e6,
+            205e6,
+            30 days
+        );
         jagaStake = new JagaStake(address(usdc));
         claimManager = new ClaimManager(address(usdc));
         vault = new InvestmentManager(owner, address(usdc));
@@ -50,10 +56,12 @@ contract InsuranceManagerTest is Test {
         usdc.mint(user, 150e6);
         vm.startPrank(user);
         usdc.approve(address(insuranceManager), 100e6);
-        insuranceManager.payPremium(1);
+        insuranceManager.payPremium(1, 1, owner);
         vm.stopPrank();
 
-        (uint256 lastPaidAt, , bool active) = insuranceManager.policies(user);
+        (uint256 lastPaidAt, , , , bool active) = insuranceManager.policies(
+            user
+        );
         console.log(active);
         assertTrue(active);
         assertGt(lastPaidAt, 0);
@@ -66,7 +74,10 @@ contract InsuranceManagerTest is Test {
         vm.warp(block.timestamp + 40 days);
 
         insuranceManager.setApproval(1_500e6);
-        insuranceManager.transferRevenue(0);
+        insuranceManager.transferRevenue(
+            usdc.balanceOf(address(insuranceManager)),
+            0
+        );
         assertGt(usdc.balanceOf(address(claimManager)), 0);
         assertGt(usdc.balanceOf(address(jagaStake)), 0);
         assertGt(usdc.balanceOf(address(owner)), 0);

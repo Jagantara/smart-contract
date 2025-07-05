@@ -19,20 +19,23 @@ contract InsuranceManager {
     address public jagaStakeContract;
     address public claimManagerContract;
     address public investmentManagerContract;
-    // Price of a premium payment in USDC
-    uint256 public premiumPrice;
     // Duration for which a premium remains valid
     uint256 public premiumDuration;
+    uint256 public totalUser;
 
     IERC20 public usdc;
 
     struct Policy {
         uint256 lastPaidAt;
         uint256 duration;
+        address coveredAddress;
+        uint256 tier;
         bool active;
     }
 
     mapping(address => Policy) public policies;
+
+    mapping(uint256 => uint256) public tierToPrice;
 
     uint256 public totalCollected;
 
@@ -46,26 +49,44 @@ contract InsuranceManager {
 
     constructor(
         address _usdc,
-        uint256 _premiumPrice,
+        uint256 _premiumPrice1,
+        uint256 _premiumPrice2,
+        uint256 _premiumPrice3,
         uint256 _premiumDuration
     ) {
         owner = msg.sender;
         usdc = IERC20(_usdc);
-        premiumPrice = _premiumPrice;
+        tierToPrice[1] = _premiumPrice1;
+        tierToPrice[2] = _premiumPrice2;
+        tierToPrice[3] = _premiumPrice3;
         premiumDuration = _premiumDuration;
     }
 
     /**
      * @notice Allows a user to pay their insurance premium based on the duration
      * @dev Transfers USDC from the user to the contract, marks their policy as active
+     * @param tier The tier of insurance activation
      * @param duration The duration amount of insurance activation
+     * @param coveredAddress The covered address of insurance activation
      */
-    function payPremium(uint256 duration) external {
+    function payPremium(
+        uint256 tier,
+        uint256 duration,
+        address coveredAddress
+    ) external {
+        require(tierToPrice[tier] != 0, "Tier is invalid");
+        uint256 premiumPrice = tierToPrice[tier];
+
         // update the policy state
         policies[msg.sender].lastPaidAt = block.timestamp;
         policies[msg.sender].active = true;
         policies[msg.sender].duration = duration;
+        policies[msg.sender].coveredAddress = coveredAddress;
+        policies[msg.sender].tier = tier;
         totalCollected += premiumPrice;
+        if (policies[msg.sender].lastPaidAt == 0) {
+            totalUser += 1;
+        }
 
         uint256 price = premiumPrice * duration;
         require(
@@ -91,16 +112,22 @@ contract InsuranceManager {
     /**
      * @notice Distributes collected revenue to other modules (JagaStake, ClaimManager, InvestmentManager)
      * @dev Only callable by the owner. Allocation: 30% to staking, 25% to claims, 20% to owner, 25% to investment
+     * @param balance The amount of money that's want to be revenued
      * @param sessionId The session ID used in JagaStake when adding revenue
      */
-    function transferRevenue(uint256 sessionId) external onlyOwner {
-        uint256 balance = usdc.balanceOf(address(this));
-        require(balance > 0, "No revenue");
+    function transferRevenue(
+        uint256 balance,
+        uint256 sessionId
+    ) external onlyOwner {
+        uint256 balanceManager = usdc.balanceOf(address(this));
+        require(balanceManager >= balance, "No revenue");
 
         // set allocation based on balance
         uint256 jagaStakeAllocation = (30 * balance) / 100;
         uint256 ownerAllocation = (20 * balance) / 100;
         uint256 claimManagerAllocation = (25 * balance) / 100;
+        uint256 investmentManagerAllocation = balance -
+            (jagaStakeAllocation + ownerAllocation + claimManagerAllocation);
 
         IJagaStake(jagaStakeContract).addRevenue(
             sessionId,
@@ -108,10 +135,9 @@ contract InsuranceManager {
         );
         usdc.transfer(address(owner), ownerAllocation);
         usdc.transfer(address(claimManagerContract), claimManagerAllocation);
-        // last transfer use balance left to avoid any precision loss from the calculation
         usdc.transfer(
             address(investmentManagerContract),
-            usdc.balanceOf(address(this))
+            investmentManagerAllocation
         );
 
         emit RevenueTransferred(balance);

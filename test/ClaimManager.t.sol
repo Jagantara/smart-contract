@@ -24,7 +24,13 @@ contract ClaimManagerTest is Test {
     function setUp() public {
         vm.startPrank(owner);
         usdc = new MockUSDC();
-        insuranceManager = new InsuranceManager(address(usdc), 100e6, 30 days);
+        insuranceManager = new InsuranceManager(
+            address(usdc),
+            65e6,
+            145e6,
+            205e6,
+            30 days
+        );
         claimManager = new ClaimManager(address(usdc));
         jagaStake = new JagaStake(address(usdc));
         jagaToken = JagaToken(jagaStake.getJagaToken());
@@ -42,7 +48,7 @@ contract ClaimManagerTest is Test {
         vm.prank(user);
         usdc.approve(address(insuranceManager), 100e6);
         vm.prank(user);
-        insuranceManager.payPremium(1);
+        insuranceManager.payPremium(1, 1, owner);
 
         // Submit and approve a claim
         vm.prank(user);
@@ -72,7 +78,7 @@ contract ClaimManagerTest is Test {
         vm.prank(user);
         claimManager.claimPayout(claimId);
 
-        assertEq(usdc.balanceOf(user), 100e6);
+        assertEq(usdc.balanceOf(user), 135e6);
         assertTrue(claimManager.claimExecuted(claimId));
     }
 
@@ -82,7 +88,7 @@ contract ClaimManagerTest is Test {
         vm.prank(user);
         usdc.approve(address(insuranceManager), 100e6);
         vm.prank(user);
-        insuranceManager.payPremium(1);
+        insuranceManager.payPremium(1, 1, owner);
 
         vm.prank(user);
         uint256 claimId = dao.submitClaim(

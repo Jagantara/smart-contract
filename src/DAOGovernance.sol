@@ -5,6 +5,18 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IInsuranceManager {
     function isActive(address user) external view returns (bool);
+    function policies(
+        address user
+    )
+        external
+        view
+        returns (
+            uint256 lastPaidAt,
+            uint256 duration,
+            address coveredAddress,
+            uint256 tier,
+            bool active
+        );
 }
 
 /**
@@ -30,6 +42,8 @@ contract DAOGovernance {
     // Structure of a claim proposal
     struct ClaimProposal {
         address claimant;
+        address coveredAddress;
+        uint256 tier;
         string title;
         string reason;
         string claimType;
@@ -113,10 +127,15 @@ contract DAOGovernance {
             IInsuranceManager(insuranceManager).isActive(msg.sender),
             "Invalid User"
         );
+        (, , address coveredAddress, uint256 tier, ) = IInsuranceManager(
+            insuranceManager
+        ).policies(msg.sender);
         uint256 id = claimCounter++;
 
         ClaimProposal storage proposal = _claims[id];
         proposal.claimant = msg.sender;
+        proposal.coveredAddress = coveredAddress;
+        proposal.tier = tier;
         proposal.title = title;
         proposal.reason = reason;
         proposal.claimType = claimType;

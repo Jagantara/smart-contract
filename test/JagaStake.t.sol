@@ -21,10 +21,14 @@ contract JagaStakeTest is Test {
         vm.startPrank(owner);
         usdc = new MockUSDC();
         jagaStake = new JagaStake(address(usdc));
-
-        insuranceManager = new InsuranceManager(address(usdc), 90e6, 30 days);
+        insuranceManager = new InsuranceManager(
+            address(usdc),
+            65e6,
+            145e6,
+            205e6,
+            30 days
+        );
         insuranceManager.setConfig(address(jagaStake), owner, owner); // owner is dummy address
-
         jagaStake.setConfig(address(insuranceManager), address(0));
         jagaToken = jagaStake.getJagaToken();
 
@@ -68,7 +72,10 @@ contract JagaStakeTest is Test {
         vm.startPrank(owner);
         usdc.mint(address(insuranceManager), 100e6);
         insuranceManager.setApproval(100e6);
-        insuranceManager.transferRevenue(1);
+        insuranceManager.transferRevenue(
+            usdc.balanceOf(address(insuranceManager)),
+            1
+        );
         vm.stopPrank();
 
         assertEq(jagaStake.timeLeft(), 2419200); // 28 days left
@@ -90,7 +97,10 @@ contract JagaStakeTest is Test {
         vm.startPrank(owner);
         usdc.mint(address(insuranceManager), 100e6);
         insuranceManager.setApproval(100e6);
-        insuranceManager.transferRevenue(1);
+        insuranceManager.transferRevenue(
+            usdc.balanceOf(address(insuranceManager)),
+            1
+        );
         vm.stopPrank();
 
         vm.startPrank(user);
