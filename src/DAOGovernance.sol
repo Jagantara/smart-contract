@@ -67,8 +67,8 @@ contract DAOGovernance {
 
     // Counter for generating unique claim IDs
     uint256 public claimCounter;
-    // Internal mapping of claim ID to ClaimProposal
-    mapping(uint256 => ClaimProposal) private _claims;
+    // Mapping of claim ID to ClaimProposal
+    mapping(uint256 => ClaimProposal) public claims;
     // Mapping of claim ID to its claimant
     mapping(uint256 => address) public claimOwner;
 
@@ -101,7 +101,7 @@ contract DAOGovernance {
     }
 
     modifier onlyClaimOwner(uint256 claimId) {
-        require(_claims[claimId].claimant == msg.sender, "Not claimant");
+        require(claims[claimId].claimant == msg.sender, "Not claimant");
         _;
     }
 
@@ -133,7 +133,7 @@ contract DAOGovernance {
         ).policies(msg.sender);
         uint256 id = claimCounter++;
 
-        ClaimProposal storage proposal = _claims[id];
+        ClaimProposal storage proposal = claims[id];
         proposal.claimant = msg.sender;
         proposal.coveredAddress = coveredAddress;
         proposal.tier = tier;
@@ -157,7 +157,7 @@ contract DAOGovernance {
      * @param approve Whether to vote yes (`true`) or no (`false`)
      */
     function vote(uint256 claimId, bool approve) external {
-        ClaimProposal storage proposal = _claims[claimId];
+        ClaimProposal storage proposal = claims[claimId];
         require(proposal.status == ClaimStatus.Pending, "Voting closed");
         require(
             block.timestamp <= proposal.createdAt + VOTING_PERIOD,
@@ -188,7 +188,7 @@ contract DAOGovernance {
      * @return yesRatio The ratio of approved votes to total votes
      */
     function executeVote(uint256 claimId) external returns (uint256 yesRatio) {
-        ClaimProposal storage proposal = _claims[claimId];
+        ClaimProposal storage proposal = claims[claimId];
         require(proposal.status == ClaimStatus.Pending, "Already executed");
 
         uint256 totalVotes = proposal.yesVotes + proposal.noVotes;
@@ -223,7 +223,7 @@ contract DAOGovernance {
     // ========== For ClaimManager.sol ==========
 
     function isClaimApproved(uint256 claimId) external view returns (bool) {
-        return _claims[claimId].status == ClaimStatus.Approved;
+        return claims[claimId].status == ClaimStatus.Approved;
     }
 
     /**
@@ -236,14 +236,14 @@ contract DAOGovernance {
     function getClaimData(
         uint256 claimId
     ) external view returns (address, uint256, uint256) {
-        ClaimProposal storage proposal = _claims[claimId];
+        ClaimProposal storage proposal = claims[claimId];
         return (proposal.claimant, proposal.amount, proposal.approvedAt);
     }
 
     function getClaimStatus(
         uint256 claimId
     ) external view returns (ClaimStatus) {
-        return _claims[claimId].status;
+        return claims[claimId].status;
     }
 
     /**
