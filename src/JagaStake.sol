@@ -34,7 +34,7 @@ contract JagaStake {
         bool finalized;
     }
 
-    // User’s current staked USDC amount
+    // User's current staked USDC amount
     mapping(address => uint256) public currentStake;
     // Mapping from session ID to session data
     mapping(uint256 => Session) public sessions;
@@ -43,6 +43,10 @@ contract JagaStake {
     // Mapping of user has claimed reward per session (sessionId => user => reward claimed)
     mapping(uint256 => mapping(address => bool)) public claimed;
     mapping(address => uint256[]) public sessionToClaim;
+
+    // Track all stakers
+    address[] public stakers;
+    mapping(address => bool) public isStaker;
 
     event Staked(address indexed user, uint256 indexed amount);
     event Unstaked(address indexed user, uint256 indexed amount);
@@ -66,17 +70,54 @@ contract JagaStake {
         _;
     }
 
-    /// @dev Updates session counter and creates next sessions if the previos session has passed
+    /// @dev Updates session counter and creates next sessions if the previous session has passed
     modifier updateSession() {
         uint256 elapsed = block.timestamp - sessionStart;
 
         if (elapsed >= sessionDuration) {
             uint256 sessionsPassed = elapsed / sessionDuration;
 
-            sessionStart += sessionsPassed * sessionDuration;
-            sessionCounter += sessionsPassed;
-        }
+            // Process each session that has passed
+            for (uint256 i = 0; i < sessionsPassed; i++) {
+                uint256 newSessionId = sessionCounter + 1;
 
+                // Calculate total staked for the new session
+                uint256 totalStaked = 0;
+
+                // For each staker that has a current stake, copy it to the new session
+                for (uint256 k = 0; k < stakers.length; k++) {
+                    address staker = stakers[k];
+                    if (currentStake[staker] > 0) {
+                        sessionStake[newSessionId][staker] = currentStake[
+                            staker
+                        ];
+                        totalStaked += currentStake[staker];
+
+                        // Add to claim list if not already present
+                        bool alreadyAdded = false;
+                        for (
+                            uint256 j = 0;
+                            j < sessionToClaim[staker].length;
+                            j++
+                        ) {
+                            if (sessionToClaim[staker][j] == newSessionId) {
+                                alreadyAdded = true;
+                                break;
+                            }
+                        }
+                        if (!alreadyAdded) {
+                            sessionToClaim[staker].push(newSessionId);
+                        }
+                    }
+                }
+
+                // Set the calculated total staked
+                sessions[newSessionId].totalStaked = totalStaked;
+                sessionCounter = newSessionId;
+            }
+
+            sessionStart += sessionsPassed * sessionDuration;
+        }
         _;
     }
 
@@ -87,12 +128,20 @@ contract JagaStake {
     function stake(uint256 amount) external updateSession {
         require(amount > 0, "Zero stake");
 
+        // Add user to stakers list if not already present
+        if (!isStaker[msg.sender]) {
+            stakers.push(msg.sender);
+            isStaker[msg.sender] = true;
+        }
+
         // update state
         currentStake[msg.sender] += amount;
         // only able to stake the next session
         sessions[sessionCounter + 1].totalStaked += amount;
+        if (sessionStake[sessionCounter + 1][msg.sender] == 0) {
+            sessionToClaim[msg.sender].push(sessionCounter + 1);
+        }
         sessionStake[sessionCounter + 1][msg.sender] += amount;
-        sessionToClaim[msg.sender].push(sessionCounter + 1);
 
         // user stake their money and the JagaToken minted
         require(
@@ -115,7 +164,26 @@ contract JagaStake {
         currentStake[msg.sender] -= amount;
         sessions[sessionCounter + 1].totalStaked -= amount;
         sessionStake[sessionCounter + 1][msg.sender] -= amount;
-        sessionToClaim[msg.sender].pop();
+
+        // Remove from sessionToClaim if stake becomes 0
+        if (sessionStake[sessionCounter + 1][msg.sender] == 0) {
+            // Find and remove the session from sessionToClaim
+            for (uint256 i = 0; i < sessionToClaim[msg.sender].length; i++) {
+                if (sessionToClaim[msg.sender][i] == sessionCounter + 1) {
+                    // Move the last element to this position and pop
+                    sessionToClaim[msg.sender][i] = sessionToClaim[msg.sender][
+                        sessionToClaim[msg.sender].length - 1
+                    ];
+                    sessionToClaim[msg.sender].pop();
+                    break;
+                }
+            }
+        }
+
+        // Remove from stakers list if no more stake
+        if (currentStake[msg.sender] == 0) {
+            isStaker[msg.sender] = false;
+        }
 
         // user received their staked money and the JagaToken burned
         require(usdc.transfer(msg.sender, amount), "Transfer failed");
@@ -142,7 +210,7 @@ contract JagaStake {
         sessions[sessionId].totalReward += amount;
         sessions[sessionId].finalized = true;
 
-        // transfer the revenue from insuranceManager to this contract for spesific sessionId
+        // transfer the revenue from insuranceManager to this contract for specific sessionId
         require(
             usdc.transferFrom(msg.sender, address(this), amount),
             "Transfer failed"
@@ -159,20 +227,22 @@ contract JagaStake {
 
         for (uint256 i = 0; i < sessionToClaim[msg.sender].length; i++) {
             uint256 sessionId = sessionToClaim[msg.sender][i];
-            if (!sessions[sessionId].finalized) {
-                break;
-            }
-            require(
-                sessions[sessionId].totalReward > 0,
-                "There are no revenue to be shared"
-            );
-            require(!claimed[sessionId][msg.sender], "Already claimed");
 
-            uint256 sessionStaked = sessionStake[sessionId][msg.sender];
-            require(sessionStaked > 0, "No stake");
+            if (!sessions[sessionId].finalized) {
+                continue;
+            }
+
+            if (
+                sessions[sessionId].totalReward == 0 ||
+                claimed[sessionId][msg.sender] ||
+                sessionStake[sessionId][msg.sender] == 0
+            ) {
+                continue; // Skip this session
+            }
 
             totalReward +=
-                (sessionStaked * sessions[sessionId].totalReward) /
+                (sessionStake[sessionId][msg.sender] *
+                    sessions[sessionId].totalReward) /
                 sessions[sessionId].totalStaked;
             claimed[sessionId][msg.sender] = true;
             emit Claimed(msg.sender, sessionId, totalReward);
@@ -218,23 +288,29 @@ contract JagaStake {
      * @notice Returns the pending reward for a user in a session (getter function for frontend)
      * @return totalReward The pending reward amount
      */
-    function pendingReward() public view returns (uint256 totalReward) {
+    function pendingReward()
+        public
+        updateSession
+        returns (uint256 totalReward)
+    {
         for (uint256 i = 0; i < sessionToClaim[msg.sender].length; i++) {
             uint256 sessionId = sessionToClaim[msg.sender][i];
             if (!sessions[sessionId].finalized) {
-                break;
+                continue; // Skip this session
             }
-            require(
-                sessions[sessionId].totalReward > 0,
-                "There are no revenue to be shared"
-            );
-            require(!claimed[sessionId][msg.sender], "Already claimed");
 
-            uint256 sessionStaked = sessionStake[sessionId][msg.sender];
-            require(sessionStaked > 0, "No stake");
+            if (
+                sessions[sessionId].totalReward == 0 ||
+                claimed[sessionId][msg.sender] ||
+                sessionStake[sessionId][msg.sender] == 0 ||
+                sessions[sessionId].totalStaked == 0
+            ) {
+                continue; // Skip this session
+            }
 
             totalReward +=
-                (sessionStaked * sessions[sessionId].totalReward) /
+                (sessionStake[sessionId][msg.sender] *
+                    sessions[sessionId].totalReward) /
                 sessions[sessionId].totalStaked;
         }
     }
@@ -264,5 +340,14 @@ contract JagaStake {
 
     function setSessionDuration(uint256 _sessionDuration) public onlyOwner {
         sessionDuration = _sessionDuration;
+    }
+
+    // Additional getter functions for debugging
+    function getStakers() external view returns (address[] memory) {
+        return stakers;
+    }
+
+    function getStakersCount() external view returns (uint256) {
+        return stakers.length;
     }
 }

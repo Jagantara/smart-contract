@@ -7,6 +7,7 @@ import "../src/mock/MockUSDC.sol";
 import "../src/JagaToken.sol";
 import "../src/InsuranceManager.sol";
 import "../src/ClaimManager.sol";
+import {console} from "forge-std/console.sol";
 
 contract JagaStakeTest is Test {
     JagaStake jagaStake;
@@ -81,6 +82,28 @@ contract JagaStakeTest is Test {
         assertEq(jagaStake.timeLeft(), 2419200); // 28 days left
 
         vm.startPrank(user);
+        (uint256 totalStaked, uint256 totalReward, bool finalized) = jagaStake
+            .getSessionInfo(1);
+        console.log("Session 1 total staked:", totalStaked);
+        console.log("Session 1 total reward:", totalReward);
+        console.log("Session 1 finalized:", finalized);
+
+        // For getUserSessionStake - this one works as is
+        console.log(
+            "User stake in session 1:",
+            jagaStake.getUserSessionStake(user, 1)
+        );
+
+        // For getUserSessionsToClaim - handle the array
+        uint256[] memory sessionsToClaimArray = jagaStake
+            .getUserSessionsToClaim(user);
+        console.log(
+            "Number of sessions to claim:",
+            sessionsToClaimArray.length
+        );
+        for (uint i = 0; i < sessionsToClaimArray.length; i++) {
+            console.log("Session to claim:", sessionsToClaimArray[i]);
+        }
         assertEq(jagaStake.pendingReward(), 30e6);
         jagaStake.claim();
         assertEq(usdc.balanceOf(user), 30e6); // 30% of the revenue
