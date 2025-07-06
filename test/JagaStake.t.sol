@@ -82,17 +82,6 @@ contract JagaStakeTest is Test {
         assertEq(jagaStake.timeLeft(), 2419200); // 28 days left
 
         vm.startPrank(user);
-        (uint256 totalStaked, uint256 totalReward, bool finalized) = jagaStake
-            .getSessionInfo(1);
-        console.log("Session 1 total staked:", totalStaked);
-        console.log("Session 1 total reward:", totalReward);
-        console.log("Session 1 finalized:", finalized);
-
-        // For getUserSessionStake - this one works as is
-        console.log(
-            "User stake in session 1:",
-            jagaStake.getUserSessionStake(user, 1)
-        );
 
         // For getUserSessionsToClaim - handle the array
         uint256[] memory sessionsToClaimArray = jagaStake
