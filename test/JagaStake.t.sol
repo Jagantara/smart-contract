@@ -82,17 +82,6 @@ contract JagaStakeTest is Test {
         assertEq(jagaStake.timeLeft(), 2419200); // 28 days left
 
         vm.startPrank(user);
-
-        // For getUserSessionsToClaim - handle the array
-        uint256[] memory sessionsToClaimArray = jagaStake
-            .getUserSessionsToClaim(user);
-        console.log(
-            "Number of sessions to claim:",
-            sessionsToClaimArray.length
-        );
-        for (uint i = 0; i < sessionsToClaimArray.length; i++) {
-            console.log("Session to claim:", sessionsToClaimArray[i]);
-        }
         assertEq(jagaStake.pendingReward(), 30e6);
         jagaStake.claim();
         assertEq(usdc.balanceOf(user), 30e6); // 30% of the revenue
