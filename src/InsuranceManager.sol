@@ -18,7 +18,7 @@ contract InsuranceManager {
     address public owner;
     address public jagaStakeContract;
     address public claimManagerContract;
-    address public investmentManagerContract;
+    address public morphoReinvestContract;
     // Duration for which a premium remains valid
     uint256 public premiumDuration;
     uint256 public totalUser;
@@ -136,7 +136,7 @@ contract InsuranceManager {
         usdc.transfer(address(owner), ownerAllocation);
         usdc.transfer(address(claimManagerContract), claimManagerAllocation);
         usdc.transfer(
-            address(investmentManagerContract),
+            address(morphoReinvestContract),
             investmentManagerAllocation
         );
 
@@ -148,18 +148,18 @@ contract InsuranceManager {
     }
 
     /**
-     * @notice Sets the configuration for JagaStake, ClaimManager and InvestmentManager contracts.
+     * @notice Sets the configuration for JagaStake, ClaimManager and MorphoReinvest contracts.
      * @dev Only callable by the contract owner.
      * @param _jagaStake The address of the Jaga stake contract.
-     * @param _investmentManager The address of the InvestmentManager contract.
+     * @param _morphoReinvest The address of the MorphoReinvest contract.
      */
     function setConfig(
         address _jagaStake,
         address _claimManager,
-        address _investmentManager
+        address _morphoReinvest
     ) external onlyOwner {
         jagaStakeContract = _jagaStake;
         claimManagerContract = _claimManager;
-        investmentManagerContract = _investmentManager;
+        morphoReinvestContract = _morphoReinvest;
     }
 }
