@@ -75,8 +75,7 @@ contract InsuranceManagerTest is Test {
 
         insuranceManager.setApproval(1_500e6);
         insuranceManager.transferRevenue(
-            usdc.balanceOf(address(insuranceManager)),
-            0
+            usdc.balanceOf(address(insuranceManager))
         );
         assertGt(usdc.balanceOf(address(claimManager)), 0);
         assertGt(usdc.balanceOf(address(jagaStake)), 0);

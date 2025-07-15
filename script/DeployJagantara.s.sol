@@ -8,19 +8,23 @@ import "../src/JagaStake.sol";
 import "../src/JagaToken.sol";
 import "../src/DAOGovernance.sol";
 import "../src/ClaimManager.sol";
-import "../src/InvestmentManager.sol";
+import "../src/MorphoReinvest.sol";
 import "../src/mock/MockUSDC.sol";
+import "../src/mock/MockMorphoVault.sol";
 
 contract DeployJagantara is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address deployer = vm.addr(deployerPrivateKey);
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // Deploy Mock USDC first
+        // Deploy Mock USDC
         MockUSDC usdc = new MockUSDC();
         console2.log("USDC deployed at:", address(usdc));
+
+        // Deploy Mock Morpho Vault
+        MockMorphoVault morpho = new MockMorphoVault(address(usdc));
+        console2.log("Morpho deployed at:", address(morpho));
 
         // Deploy main contracts
         InsuranceManager insuranceManager = new InsuranceManager(
@@ -37,8 +41,8 @@ contract DeployJagantara is Script {
             address(insuranceManager)
         );
         ClaimManager claimManager = new ClaimManager(address(usdc));
-        InvestmentManager investmentManager = new InvestmentManager(
-            deployer,
+        MorphoReinvest morphoReinvest = new MorphoReinvest(
+            address(morpho),
             address(usdc)
         );
 
@@ -46,11 +50,10 @@ contract DeployJagantara is Script {
         insuranceManager.setConfig(
             address(jagaStake),
             address(claimManager),
-            address(investmentManager)
+            address(morphoReinvest)
         );
         jagaStake.setConfig(address(insuranceManager), address(claimManager));
         dao.setConfig(address(jagaToken), address(insuranceManager));
-        investmentManager.setConfig(address(jagaStake));
         claimManager.setConfig(address(dao), address(jagaStake));
 
         vm.stopBroadcast();
@@ -60,9 +63,6 @@ contract DeployJagantara is Script {
         console.log("JagaToken deployed at:", address(jagaToken));
         console.log("DAOGovernance deployed at:", address(dao));
         console.log("ClaimManager deployed at:", address(claimManager));
-        console.log(
-            "InvestmentManager deployed at:",
-            address(investmentManager)
-        );
+        console.log("MorphoReinvest deployed at:", address(morphoReinvest));
     }
 }

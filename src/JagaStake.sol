@@ -10,39 +10,26 @@ interface IJagaToken {
 }
 
 /**
- * @title JagaStake
- * @notice A staking contract where users stake USDC to earn rewards per 30-day session
- * @dev Rewards are distributed proportionally based on stake in finalized sessions
+ * @title JagaStake - Synthetix Style
+ * @notice A staking contract using Synthetix-style continuous rewards distribution
+ * @dev Rewards are distributed continuously based on time-weighted stake participation
  */
 contract JagaStake {
     IERC20 public immutable usdc;
-    uint256 public sessionDuration = 30 days;
-    address public insuranceManager;
     JagaToken public jagaToken;
-    // Address authorized to call emergency withdrawals (e.g. ClaimManager)
+    address public insuranceManager;
     address public claimManager;
     address public owner;
-    // Index of the current staking session
-    uint256 public sessionCounter;
-    // Timestamp of the current session start
-    uint256 public sessionStart;
 
-    // Structure of session data
-    struct Session {
-        uint256 totalStaked;
-        uint256 totalReward;
-        bool finalized;
-    }
-
-    // User's current staked USDC amount
-    mapping(address => uint256) public currentStake;
-    // Mapping from session ID to session data
-    mapping(uint256 => Session) public sessions;
-    // Mapping of user stake per session (sessionId => user => staked amount)
-    mapping(uint256 => mapping(address => uint256)) public sessionStake;
-    // Mapping of user has claimed reward per session (sessionId => user => reward claimed)
-    mapping(uint256 => mapping(address => bool)) public claimed;
-    mapping(address => uint256[]) public sessionToClaim;
+    uint256 public totalSupply; // Total staked tokens
+    uint256 public rewardRate; // Reward rate per second
+    uint256 public lastUpdateTime; // Last time rewards were updated
+    uint256 public rewardPerTokenStored; // Reward per token stored (accumulated)
+    uint256 public rewardsDuration = 30 days; // Duration for reward distribution (default 30 days)
+    uint256 public periodFinish; // Timestamp when current reward period ends
+    mapping(address => uint256) public balances; // User balances
+    mapping(address => uint256) public userRewardPerTokenPaid; // User reward per token paid (last claimed rewardPerToken)
+    mapping(address => uint256) public rewards; // User rewards to be claimed
 
     // Track all stakers
     address[] public stakers;
@@ -50,19 +37,15 @@ contract JagaStake {
 
     event Staked(address indexed user, uint256 indexed amount);
     event Unstaked(address indexed user, uint256 indexed amount);
-    event Claimed(
-        address indexed user,
-        uint256 indexed session,
-        uint256 indexed reward
-    );
-    event RevenueAdded(uint256 indexed session, uint256 indexed amount);
+    event RewardPaid(address indexed user, uint256 indexed reward);
+    event RewardAdded(uint256 indexed reward);
+    event RewardsDurationUpdated(uint256 indexed newDuration);
 
     constructor(address _usdc) {
         usdc = IERC20(_usdc);
-        sessionStart = block.timestamp;
-        sessionCounter = 0;
         jagaToken = new JagaToken();
         owner = msg.sender;
+        lastUpdateTime = block.timestamp;
     }
 
     modifier onlyOwner() {
@@ -70,63 +53,61 @@ contract JagaStake {
         _;
     }
 
-    /// @dev Updates session counter and creates next sessions if the previous session has passed
-    modifier updateSession() {
-        uint256 elapsed = block.timestamp - sessionStart;
+    modifier updateReward(address account) {
+        rewardPerTokenStored = rewardPerToken();
+        lastUpdateTime = lastTimeRewardApplicable();
 
-        if (elapsed >= sessionDuration) {
-            uint256 sessionsPassed = elapsed / sessionDuration;
-
-            // Process each session that has passed
-            for (uint256 i = 0; i < sessionsPassed; i++) {
-                uint256 newSessionId = sessionCounter + 1;
-
-                // Calculate total staked for the new session
-                uint256 totalStaked = 0;
-
-                // For each staker that has a current stake, copy it to the new session
-                for (uint256 k = 0; k < stakers.length; k++) {
-                    address staker = stakers[k];
-                    if (currentStake[staker] > 0) {
-                        sessionStake[newSessionId][staker] = currentStake[
-                            staker
-                        ];
-                        totalStaked += currentStake[staker];
-
-                        // Add to claim list if not already present
-                        bool alreadyAdded = false;
-                        for (
-                            uint256 j = 0;
-                            j < sessionToClaim[staker].length;
-                            j++
-                        ) {
-                            if (sessionToClaim[staker][j] == newSessionId) {
-                                alreadyAdded = true;
-                                break;
-                            }
-                        }
-                        if (!alreadyAdded) {
-                            sessionToClaim[staker].push(newSessionId);
-                        }
-                    }
-                }
-
-                // Set the calculated total staked
-                sessions[newSessionId].totalStaked = totalStaked;
-                sessionCounter = newSessionId;
-            }
-
-            sessionStart += sessionsPassed * sessionDuration;
+        if (account != address(0)) {
+            rewards[account] = earned(account);
+            userRewardPerTokenPaid[account] = rewardPerTokenStored;
         }
         _;
     }
 
     /**
-     * @notice Stakes USDC for the next session and mints JagaToken
-     * @param amount The amount of USDC to stake
+     * @notice Returns the last timestamp at which rewards were applicable
+     * @return Timestamp (in seconds)
      */
-    function stake(uint256 amount) external updateSession {
-        require(amount > 0, "Zero stake");
+    function lastTimeRewardApplicable() public view returns (uint256) {
+        return block.timestamp < periodFinish ? block.timestamp : periodFinish;
+    }
+
+    /**
+     * @notice Returns the accumulated reward per token.
+     * @return Reward per token scaled by 1e6.
+     */
+    function rewardPerToken() public view returns (uint256) {
+        if (totalSupply == 0) {
+            return rewardPerTokenStored;
+        }
+
+        return
+            rewardPerTokenStored +
+            (((lastTimeRewardApplicable() - lastUpdateTime) *
+                rewardRate *
+                1e6) / totalSupply);
+    }
+
+    /**
+     * @notice Returns the earned rewards for a specific user.
+     * @param account The address of the user.
+     * @return The amount of USDC reward earned by the user.
+     */
+    function earned(address account) public view returns (uint256) {
+        return
+            (balances[account] *
+                (rewardPerToken() - userRewardPerTokenPaid[account])) /
+            1e6 +
+            rewards[account];
+    }
+
+    /**
+     * @notice Stakes USDC and mints JagaToken to the staker.
+     * @dev calls updateReward(msg.sender) which updates the global state and user's reward
+     * @param amount The amount of USDC to stake.
+     */
+    function stake(uint256 amount) external updateReward(msg.sender) {
+        require(amount > 0, "Cannot stake 0");
 
         // Add user to stakers list if not already present
         if (!isStaker[msg.sender]) {
@@ -134,16 +115,11 @@ contract JagaStake {
             isStaker[msg.sender] = true;
         }
 
-        // update state
-        currentStake[msg.sender] += amount;
-        // only able to stake the next session
-        sessions[sessionCounter + 1].totalStaked += amount;
-        if (sessionStake[sessionCounter + 1][msg.sender] == 0) {
-            sessionToClaim[msg.sender].push(sessionCounter + 1);
-        }
-        sessionStake[sessionCounter + 1][msg.sender] += amount;
+        // Update balances
+        totalSupply += amount;
+        balances[msg.sender] += amount;
 
-        // user stake their money and the JagaToken minted
+        // Transfer USDC and mint JagaToken
         require(
             usdc.transferFrom(msg.sender, address(this), amount),
             "Transfer failed"
@@ -154,38 +130,24 @@ contract JagaStake {
     }
 
     /**
-     * @notice Unstakes USDC from the current session
-     * @param amount Amount of USDC to unstake
+     * @notice Unstakes USDC and burns the equivalent JagaToken.
+     * @dev calls updateReward(msg.sender) which updates the global state and user's reward
+     * @param amount The amount of USDC to unstake.
      */
-    function unstake(uint256 amount) external updateSession {
-        require(currentStake[msg.sender] >= amount, "Insufficient stake");
+    function unstake(uint256 amount) external updateReward(msg.sender) {
+        require(amount > 0, "Cannot unstake 0");
+        require(balances[msg.sender] >= amount, "Insufficient balance");
 
-        // update state
-        currentStake[msg.sender] -= amount;
-        sessions[sessionCounter + 1].totalStaked -= amount;
-        sessionStake[sessionCounter + 1][msg.sender] -= amount;
-
-        // Remove from sessionToClaim if stake becomes 0
-        if (sessionStake[sessionCounter + 1][msg.sender] == 0) {
-            // Find and remove the session from sessionToClaim
-            for (uint256 i = 0; i < sessionToClaim[msg.sender].length; i++) {
-                if (sessionToClaim[msg.sender][i] == sessionCounter + 1) {
-                    // Move the last element to this position and pop
-                    sessionToClaim[msg.sender][i] = sessionToClaim[msg.sender][
-                        sessionToClaim[msg.sender].length - 1
-                    ];
-                    sessionToClaim[msg.sender].pop();
-                    break;
-                }
-            }
-        }
+        // Update balances
+        totalSupply -= amount;
+        balances[msg.sender] -= amount;
 
         // Remove from stakers list if no more stake
-        if (currentStake[msg.sender] == 0) {
+        if (balances[msg.sender] == 0) {
             isStaker[msg.sender] = false;
         }
 
-        // user received their staked money and the JagaToken burned
+        // Transfer USDC and burn JagaToken
         require(usdc.transfer(msg.sender, amount), "Transfer failed");
         IJagaToken(address(jagaToken)).burn(msg.sender, amount);
 
@@ -193,126 +155,63 @@ contract JagaStake {
     }
 
     /**
-     * @notice Adds revenue to a finalized past session
-     * @dev Only the insuranceManager can call this
-     * @param sessionId ID of the session to reward
-     * @param amount Revenue amount to add
+     * @notice Claims all pending rewards for the caller.
+     * @dev calls updateReward(msg.sender) which updates the global state and user's reward
      */
-    function addRevenue(
-        uint256 sessionId,
-        uint256 amount
-    ) external updateSession {
-        require(msg.sender == insuranceManager, "You're not allowed!");
-        require(sessionId < sessionCounter, "Can only reward past sessions");
-        require(!sessions[sessionId].finalized, "Already finalized");
+    function claim() external updateReward(msg.sender) {
+        uint256 reward = rewards[msg.sender];
+        if (reward > 0) {
+            rewards[msg.sender] = 0;
+            require(
+                usdc.transfer(msg.sender, reward),
+                "Reward transfer failed"
+            );
+            emit RewardPaid(msg.sender, reward);
+        }
+    }
 
-        // update state
-        sessions[sessionId].totalReward += amount;
-        sessions[sessionId].finalized = true;
+    /**
+     * @notice Adds rewards to be distributed over the rewards duration
+     * @dev Only the insuranceManager can call this; calls updateReward(address(0))
+     * @param reward Amount of rewards to add
+     */
+    function notifyRewardAmount(
+        uint256 reward
+    ) external updateReward(address(0)) {
+        require(msg.sender == insuranceManager, "Only insurance manager");
 
-        // transfer the revenue from insuranceManager to this contract for specific sessionId
+        if (block.timestamp >= periodFinish) {
+            rewardRate = reward / rewardsDuration;
+        } else {
+            uint256 remaining = periodFinish - block.timestamp;
+            uint256 leftover = remaining * rewardRate;
+            rewardRate = (reward + leftover) / rewardsDuration;
+        }
+
+        lastUpdateTime = block.timestamp;
+        periodFinish = block.timestamp + rewardsDuration;
+
+        // Transfer rewards to contract
         require(
-            usdc.transferFrom(msg.sender, address(this), amount),
+            usdc.transferFrom(msg.sender, address(this), reward),
             "Transfer failed"
         );
 
-        emit RevenueAdded(sessionId, amount);
+        emit RewardAdded(reward);
     }
 
     /**
-     * @notice Claims staking reward for a given session
+     * @notice Updates the rewards duration
+     * @dev Only callable by the owner
+     * @param _rewardsDuration New duration in seconds
      */
-    function claim() external updateSession {
-        uint256 totalReward;
-
-        for (uint256 i = 0; i < sessionToClaim[msg.sender].length; i++) {
-            uint256 sessionId = sessionToClaim[msg.sender][i];
-
-            if (!sessions[sessionId].finalized) {
-                continue;
-            }
-
-            if (
-                sessions[sessionId].totalReward == 0 ||
-                claimed[sessionId][msg.sender] ||
-                sessionStake[sessionId][msg.sender] == 0
-            ) {
-                continue; // Skip this session
-            }
-
-            totalReward +=
-                (sessionStake[sessionId][msg.sender] *
-                    sessions[sessionId].totalReward) /
-                sessions[sessionId].totalStaked;
-            claimed[sessionId][msg.sender] = true;
-            emit Claimed(msg.sender, sessionId, totalReward);
-        }
-        delete sessionToClaim[msg.sender];
-
-        require(usdc.transfer(msg.sender, totalReward), "Claim failed");
-    }
-
-    /**
-     * @notice Returns the current session number
-     * @dev Automatically updates session if needed
-     */
-    function currentSession() external updateSession returns (uint256) {
-        return sessionCounter;
-    }
-
-    /**
-     * @notice Returns the start timestamp of the next session
-     * @dev Automatically updates session if needed
-     */
-    function nextSessionStart() external updateSession returns (uint256) {
-        return sessionStart + sessionDuration;
-    }
-
-    /**
-     * @notice Returns the time left until the next session starts
-     * @dev Automatically updates session if needed
-     */
-    function timeLeft() external updateSession returns (uint256) {
-        uint256 elapsed = block.timestamp - sessionStart;
-        if (elapsed >= sessionDuration) {
-            return 0;
-        }
-        return sessionDuration - elapsed;
-    }
-
-    function getJagaToken() external view returns (JagaToken) {
-        return jagaToken;
-    }
-
-    /**
-     * @notice Returns the pending reward for a user in a session (getter function for frontend)
-     * @return totalReward The pending reward amount
-     */
-    function pendingReward()
-        public
-        updateSession
-        returns (uint256 totalReward)
-    {
-        for (uint256 i = 0; i < sessionToClaim[msg.sender].length; i++) {
-            uint256 sessionId = sessionToClaim[msg.sender][i];
-            if (!sessions[sessionId].finalized) {
-                continue; // Skip this session
-            }
-
-            if (
-                sessions[sessionId].totalReward == 0 ||
-                claimed[sessionId][msg.sender] ||
-                sessionStake[sessionId][msg.sender] == 0 ||
-                sessions[sessionId].totalStaked == 0
-            ) {
-                continue; // Skip this session
-            }
-
-            totalReward +=
-                (sessionStake[sessionId][msg.sender] *
-                    sessions[sessionId].totalReward) /
-                sessions[sessionId].totalStaked;
-        }
+    function setRewardsDuration(uint256 _rewardsDuration) external onlyOwner {
+        require(
+            block.timestamp > periodFinish,
+            "Previous rewards period must be complete"
+        );
+        rewardsDuration = _rewardsDuration;
+        emit RewardsDurationUpdated(rewardsDuration);
     }
 
     /**
@@ -321,14 +220,14 @@ contract JagaStake {
      */
     function withdraw(uint256 amount) external {
         require(msg.sender == claimManager, "Invalid user");
-        IERC20(usdc).transfer(msg.sender, amount);
+        require(usdc.transfer(msg.sender, amount), "Transfer failed");
     }
 
     /**
-     * @notice Sets the configuration for InsuranceManager and ClaimManager contracts.
-     * @dev Only callable by the contract owner.
-     * @param _insuranceManager The address of the InsuranceManager contract.
-     * @param _claimManager The address of the ClaimManager contract.
+     * @notice Sets the configuration for InsuranceManager and ClaimManager contracts
+     * @dev Only callable by the owner
+     * @param _insuranceManager The address of the InsuranceManager contract
+     * @param _claimManager The address of the ClaimManager contract
      */
     function setConfig(
         address _insuranceManager,
@@ -338,16 +237,46 @@ contract JagaStake {
         claimManager = _claimManager;
     }
 
-    function setSessionDuration(uint256 _sessionDuration) public onlyOwner {
-        sessionDuration = _sessionDuration;
+    /**
+     * @notice Returns the JagaToken contract
+     * @return The JagaToken contract instance.
+     */
+    function getJagaToken() external view returns (JagaToken) {
+        return jagaToken;
     }
 
-    // Additional getter functions for debugging
+    /**
+     * @notice Returns all stakers
+     * @return Array of staker addresses.
+     */
     function getStakers() external view returns (address[] memory) {
         return stakers;
     }
 
+    /**
+     * @notice Returns the number of stakers
+     * @return The total number of stakers.
+     */
     function getStakersCount() external view returns (uint256) {
         return stakers.length;
+    }
+
+    /**
+     * @notice Returns the balance of a user
+     * @return Amount of USDC staked.
+     */
+    function balanceOf(address account) external view returns (uint256) {
+        return balances[account];
+    }
+
+    /**
+     * @notice Returns the time left in the current reward period
+     * @return Time left in seconds
+     */
+    function timeLeft() external view returns (uint256) {
+        if (block.timestamp >= periodFinish) {
+            return 0;
+        }
+        return periodFinish - block.timestamp;
     }
 }

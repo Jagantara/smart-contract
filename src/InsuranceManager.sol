@@ -113,12 +113,8 @@ contract InsuranceManager {
      * @notice Distributes collected revenue to other modules (JagaStake, ClaimManager, InvestmentManager)
      * @dev Only callable by the owner. Allocation: 30% to staking, 25% to claims, 20% to owner, 25% to investment
      * @param balance The amount of money that's want to be revenued
-     * @param sessionId The session ID used in JagaStake when adding revenue
      */
-    function transferRevenue(
-        uint256 balance,
-        uint256 sessionId
-    ) external onlyOwner {
+    function transferRevenue(uint256 balance) external onlyOwner {
         uint256 balanceManager = usdc.balanceOf(address(this));
         require(balanceManager >= balance, "No revenue");
 
@@ -126,18 +122,15 @@ contract InsuranceManager {
         uint256 jagaStakeAllocation = (30 * balance) / 100;
         uint256 ownerAllocation = (20 * balance) / 100;
         uint256 claimManagerAllocation = (25 * balance) / 100;
-        uint256 investmentManagerAllocation = balance -
+        uint256 morphoReinvestAllocation = balance -
             (jagaStakeAllocation + ownerAllocation + claimManagerAllocation);
 
-        IJagaStake(jagaStakeContract).addRevenue(
-            sessionId,
-            jagaStakeAllocation
-        );
+        IJagaStake(jagaStakeContract).notifyRewardAmount(jagaStakeAllocation);
         usdc.transfer(address(owner), ownerAllocation);
         usdc.transfer(address(claimManagerContract), claimManagerAllocation);
         usdc.transfer(
             address(morphoReinvestContract),
-            investmentManagerAllocation
+            morphoReinvestAllocation
         );
 
         emit RevenueTransferred(balance);

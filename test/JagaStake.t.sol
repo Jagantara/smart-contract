@@ -2,88 +2,115 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
-import "../src/JagaStake.sol";
-import "../src/mock/MockUSDC.sol";
-import "../src/JagaToken.sol";
-import "../src/InsuranceManager.sol";
-import "../src/ClaimManager.sol";
-import {console} from "forge-std/console.sol";
+import {JagaStake} from "../src/JagaStake.sol";
+import {JagaToken} from "../src/JagaToken.sol";
+import {MockUSDC} from "../src/mock/MockUSDC.sol";
 
 contract JagaStakeTest is Test {
-    JagaStake jagaStake;
-    MockUSDC usdc;
-    JagaToken jagaToken;
-    InsuranceManager insuranceManager;
-    ClaimManager claimManager;
-    address owner = address(0x1);
-    address user = address(0x2);
+    JagaStake public jagaStake;
+    MockUSDC public usdc;
+    address public alice = address(1);
+    address public bob = address(2);
 
     function setUp() public {
-        vm.startPrank(owner);
         usdc = new MockUSDC();
         jagaStake = new JagaStake(address(usdc));
-        insuranceManager = new InsuranceManager(
-            address(usdc),
-            65e6,
-            145e6,
-            205e6,
-            30 days
-        );
-        insuranceManager.setConfig(address(jagaStake), owner, owner); // owner is dummy address
-        jagaStake.setConfig(address(insuranceManager), address(0));
-        jagaToken = jagaStake.getJagaToken();
 
-        usdc.mint(user, 1000e6);
-        vm.stopPrank();
+        // Mint and approve USDC for users
+        usdc.mint(alice, 1000e6);
+        usdc.mint(bob, 1000e6);
+
+        vm.prank(alice);
+        usdc.approve(address(jagaStake), type(uint256).max);
+
+        vm.prank(bob);
+        usdc.approve(address(jagaStake), type(uint256).max);
+
+        // Set insurance manager to this contract
+        jagaStake.setConfig(address(this), address(99));
     }
 
-    function testStakeUSDC() public {
-        vm.startPrank(user);
-        usdc.approve(address(jagaStake), 500e6);
-        jagaStake.stake(500e6);
+    function testStake() public {
+        vm.prank(alice);
+        jagaStake.stake(100e6);
 
-        assertEq(usdc.balanceOf(address(jagaStake)), 500e6);
-        assertEq(jagaStake.currentStake(user), 500e6);
-        assertEq(jagaToken.balanceOf(address(user)), 500e6);
-        vm.stopPrank();
+        assertEq(jagaStake.balanceOf(alice), 100e6);
+        assertEq(usdc.balanceOf(address(jagaStake)), 100e6);
     }
 
-    function testUnstakeUSDC() public {
-        vm.startPrank(user);
-        usdc.approve(address(jagaStake), 500e6);
-        jagaStake.stake(500e6);
-
+    function testUnstake() public {
+        vm.startPrank(alice);
+        jagaStake.stake(200e6);
         jagaStake.unstake(200e6);
-
-        console.log(usdc.balanceOf(user));
-        assertEq(usdc.balanceOf(user), 700e6); // 1000 - 500 + 200
-        assertEq(jagaStake.currentStake(user), 300e6);
-        assertEq(jagaToken.balanceOf(address(user)), 300e6);
         vm.stopPrank();
+
+        assertEq(jagaStake.balanceOf(alice), 0);
+        assertEq(usdc.balanceOf(alice), 1000e6);
     }
 
-    function testClaimReward() public {
-        vm.startPrank(user);
-        usdc.approve(address(jagaStake), 1000e6);
-        jagaStake.stake(1000e6);
-        vm.stopPrank();
+    function testNotifyRewardAndClaim() public {
+        // Stake first
+        vm.prank(alice);
+        jagaStake.stake(100e6);
 
-        vm.warp(block.timestamp + 62 days);
+        // Wait a bit to accumulate time
+        skip(3 days);
 
-        vm.startPrank(owner);
-        usdc.mint(address(insuranceManager), 100e6);
-        insuranceManager.setApproval(100e6);
-        insuranceManager.transferRevenue(
-            usdc.balanceOf(address(insuranceManager)),
-            1
-        );
-        vm.stopPrank();
+        // Notify reward
+        usdc.mint(address(this), 500e6);
+        usdc.approve(address(jagaStake), 500e6);
+        jagaStake.notifyRewardAmount(500e6);
 
-        assertEq(jagaStake.timeLeft(), 2419200); // 28 days left
+        skip(30 days);
 
-        vm.startPrank(user);
-        assertEq(jagaStake.pendingReward(), 30e6);
+        // Claim
+        uint256 reward = jagaStake.earned(alice);
+        assertGt(reward, 495e6);
+        vm.prank(alice);
         jagaStake.claim();
-        assertEq(usdc.balanceOf(user), 30e6); // 30% of the revenue
+
+        // Check reward received
+        uint256 balance = usdc.balanceOf(alice);
+        console.log(balance); // 1397664000
+        assertGt(balance, 900e6 + 495e6); // Initial balance (1000e6 - 100e6) + estimation reward accumulated
+    }
+
+    function testNotifyRewardAndClaimAfter() public {
+        // Notify reward first
+        usdc.mint(address(this), 500e6);
+        usdc.approve(address(jagaStake), 500e6);
+        jagaStake.notifyRewardAmount(500e6);
+
+        // Wait a bit to accumulate time
+        skip(3 days);
+
+        // Stake
+        vm.prank(alice);
+        jagaStake.stake(100e6);
+
+        skip(30 days);
+
+        // Claim
+        uint256 reward = jagaStake.earned(alice);
+        assertLt(reward, 495e6);
+        vm.prank(alice);
+        jagaStake.claim();
+
+        // Check reward received
+        uint256 balance = usdc.balanceOf(alice);
+        console.log(balance); // 1397664000
+        assertLt(balance, 900e6 + 495e6); // Initial balance (1000e6 - 100e6) + estimation reward accumulated
+    }
+
+    function testNotifyRewardRevertIfNotInsuranceManager() public {
+        vm.prank(bob);
+        vm.expectRevert("Only insurance manager");
+        jagaStake.notifyRewardAmount(100e6);
+    }
+
+    function testEmergencyWithdrawRevertIfNotClaimManager() public {
+        vm.prank(address(50));
+        vm.expectRevert("Invalid user");
+        jagaStake.withdraw(100e6);
     }
 }

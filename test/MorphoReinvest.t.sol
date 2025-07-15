@@ -5,15 +5,7 @@ import "forge-std/Test.sol";
 import "../src/MorphoReinvest.sol";
 import "../src/mock/MockMorphoVault.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
-// Simple Mock USDC
-contract MockUSDC is ERC20 {
-    constructor() ERC20("Mock USDC", "USDC") {}
-
-    function mint(address to, uint256 amount) external {
-        _mint(to, amount);
-    }
-}
+import "../src/mock/MockUSDC.sol";
 
 contract MorphoReinvestTest is Test {
     MorphoReinvest public reinvest;
