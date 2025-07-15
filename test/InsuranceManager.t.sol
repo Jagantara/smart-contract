@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "../src/InsuranceManager.sol";
 import "../src/ClaimManager.sol";
 import "../src/JagaStake.sol";
-import "../src/InvestmentManager.sol";
+import "../src/MorphoReinvest.sol";
 import "../src/DAOGovernance.sol";
 import "../src/JagaToken.sol";
 import "../src/mock/MockUSDC.sol";
@@ -15,7 +15,7 @@ contract InsuranceManagerTest is Test {
     InsuranceManager insuranceManager;
     ClaimManager claimManager;
     JagaStake jagaStake;
-    InvestmentManager vault;
+    MorphoReinvest vault;
     DAOGovernance dao;
     JagaToken jagaToken;
     MockUSDC usdc;
@@ -34,7 +34,7 @@ contract InsuranceManagerTest is Test {
         );
         jagaStake = new JagaStake(address(usdc));
         claimManager = new ClaimManager(address(usdc));
-        vault = new InvestmentManager(owner, address(usdc));
+        vault = new MorphoReinvest(address(1), address(usdc));
         dao = new DAOGovernance(
             address(jagaStake.getJagaToken()),
             address(insuranceManager)

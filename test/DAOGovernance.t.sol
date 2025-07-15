@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import "forge-std/Test.sol";
 import "../src/DAOGovernance.sol";
 import "../src/InsuranceManager.sol";
-import "../src/InvestmentManager.sol";
+import "../src/MorphoReinvest.sol";
 import "../src/ClaimManager.sol";
 import "../src/JagaToken.sol";
 import "../src/JagaStake.sol";
@@ -17,7 +17,7 @@ contract DAOGovernanceTest is Test {
     JagaToken jagaToken;
     JagaStake jagaStake;
     MockUSDC usdc;
-    InvestmentManager vault;
+    MorphoReinvest vault;
 
     address owner = address(0x1);
     address voter1 = address(0x2);
@@ -38,7 +38,7 @@ contract DAOGovernanceTest is Test {
         jagaStake = new JagaStake(address(usdc));
         jagaToken = JagaToken(jagaStake.getJagaToken());
         claimManager = new ClaimManager(address(usdc));
-        vault = new InvestmentManager(owner, address(usdc));
+        vault = new MorphoReinvest(address(1), address(usdc));
 
         dao.setConfig(address(jagaToken), address(insuranceManager));
         vm.stopPrank();

@@ -3,36 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-interface IDistributor {
-    function claim(
-        address account,
-        address reward,
-        uint256 claimable,
-        bytes32[] calldata proof
-    ) external returns (uint256 amount);
-}
-
-interface IMockMorphoVault {
-    function asset() external view returns (address);
-    function deposit(
-        uint256 assets,
-        address receiver
-    ) external returns (uint256 shares);
-    function withdraw(
-        uint256 assets,
-        address receiver,
-        address owner
-    ) external returns (uint256 shares);
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address owner
-    ) external returns (uint256 assets);
-    function maxRedeem(address owner) external view returns (uint256);
-    function totalAssets() external view returns (uint256);
-    function balances(address user) external view returns (uint256);
-}
+import {IMockMorphoVault, IDistributor} from "../src/mock/MockMorphoVault.sol";
 
 /**
  * @title MorphoReinvest
