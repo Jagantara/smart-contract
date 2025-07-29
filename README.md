@@ -15,6 +15,32 @@ Jagantara doesn't just protect claimants; it also rewards users who help secure 
 | `MorphoReinvest.sol`   | Manage USDC deposits from revenue allocation into a Morpho Vault for reinvestment. |
 | `JagaToken.sol`        | ERC20 token minted/burned during stake/unstake; used for governance voting.        |
 
+Jagantara Contract on Lisk Sepolia:
+
+- USDC 
+https://sepolia-blockscout.lisk.com/token/0xA2D17a5CAEbEC48a32fF945aAF5471Eb9b989345?tab=contract
+
+- JagaToken
+https://sepolia-blockscout.lisk.com/token/0x529bB304E550E21938c20D1E27EAa4EE0dB549E6?tab=contract
+
+- Insurance Manager
+https://sepolia-blockscout.lisk.com/address/0x3A70a20d10381447B5c1DaB62fDcE23Df9079A8E?tab=contract
+
+- Jaga Stake
+https://sepolia-blockscout.lisk.com/address/0x65165BFb8162744E1C5251c1deB196bB270fE1eE?tab=contract
+
+- Morpho
+https://sepolia-blockscout.lisk.com/address/0xFDe181Ca94A77c3C0Bdf225963725a8E4680ADcF?tab=contract
+
+- Claim Manager
+https://sepolia-blockscout.lisk.com/address/0x72aE49071e641e38350EFbE4511C70C119E48875?tab=contract
+
+- DAO Governance
+https://sepolia-blockscout.lisk.com/address/0x43C67E463C7a9aF76c52194A095E69c35edEaAeA?tab=contract
+
+- Morpho Re-invest
+https://sepolia-blockscout.lisk.com/address/0xb09e395a600eA5848f9aE593538F2C584aE23773?tab=contract
+
 ## Flow Chart
 
 ![Diagram](./images/diagram.png)
