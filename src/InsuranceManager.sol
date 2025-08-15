@@ -31,11 +31,12 @@ contract InsuranceManager {
         address coveredAddress;
         uint256 tier;
         bool active;
+        uint256 amountToCover;
     }
 
     mapping(address => Policy) public policies;
 
-    mapping(uint256 => uint256) public tierToPrice;
+    mapping(uint256 => uint256) public tierToPercentage;
 
     uint256 public totalCollected;
 
@@ -49,16 +50,16 @@ contract InsuranceManager {
 
     constructor(
         address _usdc,
-        uint256 _premiumPrice1,
-        uint256 _premiumPrice2,
-        uint256 _premiumPrice3,
+        uint256 _percentage1,
+        uint256 _percentage2,
+        uint256 _percentage3,
         uint256 _premiumDuration
     ) {
         owner = msg.sender;
         usdc = IERC20(_usdc);
-        tierToPrice[1] = _premiumPrice1;
-        tierToPrice[2] = _premiumPrice2;
-        tierToPrice[3] = _premiumPrice3;
+        tierToPercentage[1] = _percentage1; // 100 (1%)
+        tierToPercentage[2] = _percentage2; // 300 (3%)
+        tierToPercentage[3] = _percentage3; // 500 (5%)
         premiumDuration = _premiumDuration;
     }
 
@@ -72,10 +73,11 @@ contract InsuranceManager {
     function payPremium(
         uint256 tier,
         uint256 duration,
-        address coveredAddress
+        address coveredAddress,
+        uint256 amountToCover
     ) external {
-        require(tierToPrice[tier] != 0, "Tier is invalid");
-        uint256 premiumPrice = tierToPrice[tier];
+        require(tierToPercentage[tier] != 0, "Tier is invalid");
+        uint256 premiumPrice = (amountToCover * tierToPercentage[tier]) / 10000;
 
         // update the policy state
         policies[msg.sender].lastPaidAt = block.timestamp;
@@ -83,6 +85,7 @@ contract InsuranceManager {
         policies[msg.sender].duration = duration;
         policies[msg.sender].coveredAddress = coveredAddress;
         policies[msg.sender].tier = tier;
+        policies[msg.sender].amountToCover = amountToCover;
         totalCollected += premiumPrice;
         if (policies[msg.sender].lastPaidAt == 0) {
             totalUser += 1;
@@ -138,6 +141,13 @@ contract InsuranceManager {
 
     function setApproval(uint256 amount) external onlyOwner {
         usdc.approve(address(jagaStakeContract), amount);
+    }
+
+    function getPriceFromAmountTier(
+        uint256 amountToCover,
+        uint256 tier
+    ) external view returns (uint256) {
+        return (amountToCover * tierToPercentage[tier]) / 10000;
     }
 
     /**

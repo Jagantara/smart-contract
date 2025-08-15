@@ -29,9 +29,9 @@ contract DeployJagantara is Script {
         // Deploy main contracts
         InsuranceManager insuranceManager = new InsuranceManager(
             address(usdc),
-            65e6,
-            145e6,
-            205e6,
+            100,
+            200,
+            300,
             30 days
         );
         JagaStake jagaStake = new JagaStake(address(usdc));

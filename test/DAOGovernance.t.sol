@@ -29,9 +29,9 @@ contract DAOGovernanceTest is Test {
         usdc = new MockUSDC();
         insuranceManager = new InsuranceManager(
             address(usdc),
-            65e6,
-            145e6,
-            205e6,
+            100,
+            300,
+            500,
             30 days
         );
         dao = new DAOGovernance(address(jagaToken), address(insuranceManager));
@@ -60,7 +60,7 @@ contract DAOGovernanceTest is Test {
 
         vm.startPrank(claimant);
         usdc.approve(address(insuranceManager), 100e6);
-        insuranceManager.payPremium(1, 1, owner);
+        insuranceManager.payPremium(1, 1, owner, 1000e6);
         vm.stopPrank();
     }
 

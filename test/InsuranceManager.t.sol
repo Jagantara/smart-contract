@@ -27,9 +27,9 @@ contract InsuranceManagerTest is Test {
         usdc = new MockUSDC();
         insuranceManager = new InsuranceManager(
             address(usdc),
-            65e6,
-            145e6,
-            205e6,
+            100,
+            300,
+            500,
             30 days
         );
         jagaStake = new JagaStake(address(usdc));
@@ -56,7 +56,7 @@ contract InsuranceManagerTest is Test {
         usdc.mint(user, 150e6);
         vm.startPrank(user);
         usdc.approve(address(insuranceManager), 100e6);
-        insuranceManager.payPremium(1, 1, owner);
+        insuranceManager.payPremium(1, 1, owner, 1000e6);
         vm.stopPrank();
 
         (uint256 lastPaidAt, , , , bool active) = insuranceManager.policies(

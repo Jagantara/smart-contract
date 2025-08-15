@@ -26,9 +26,9 @@ contract ClaimManagerTest is Test {
         usdc = new MockUSDC();
         insuranceManager = new InsuranceManager(
             address(usdc),
-            65e6,
-            145e6,
-            205e6,
+            100,
+            300,
+            500,
             30 days
         );
         claimManager = new ClaimManager(address(usdc));
@@ -48,7 +48,7 @@ contract ClaimManagerTest is Test {
         vm.prank(user);
         usdc.approve(address(insuranceManager), 100e6);
         vm.prank(user);
-        insuranceManager.payPremium(1, 1, owner);
+        insuranceManager.payPremium(1, 1, owner, 1000e6);
 
         // Submit and approve a claim
         vm.prank(user);
@@ -78,7 +78,7 @@ contract ClaimManagerTest is Test {
         vm.prank(user);
         claimManager.claimPayout(claimId);
 
-        assertEq(usdc.balanceOf(user), 135e6);
+        assertEq(usdc.balanceOf(user), 190e6);
         assertTrue(claimManager.claimExecuted(claimId));
     }
 
@@ -88,7 +88,7 @@ contract ClaimManagerTest is Test {
         vm.prank(user);
         usdc.approve(address(insuranceManager), 100e6);
         vm.prank(user);
-        insuranceManager.payPremium(1, 1, owner);
+        insuranceManager.payPremium(1, 1, owner, 1000e6);
 
         vm.prank(user);
         uint256 claimId = dao.submitClaim(
