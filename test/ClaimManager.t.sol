@@ -78,7 +78,7 @@ contract ClaimManagerTest is Test {
         vm.prank(user);
         claimManager.claimPayout(claimId);
 
-        assertEq(usdc.balanceOf(user), 190e6);
+        assertEq(usdc.balanceOf(user), 199e6);
         assertTrue(claimManager.claimExecuted(claimId));
     }
 

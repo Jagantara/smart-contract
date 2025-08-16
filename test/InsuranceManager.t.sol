@@ -59,7 +59,7 @@ contract InsuranceManagerTest is Test {
         insuranceManager.payPremium(1, 1, owner, 1000e6);
         vm.stopPrank();
 
-        (uint256 lastPaidAt, , , , bool active) = insuranceManager.policies(
+        (uint256 lastPaidAt, , , , bool active, ) = insuranceManager.policies(
             user
         );
         console.log(active);

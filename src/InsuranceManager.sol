@@ -57,9 +57,9 @@ contract InsuranceManager {
     ) {
         owner = msg.sender;
         usdc = IERC20(_usdc);
-        tierToPercentage[1] = _percentage1; // 100 (1%)
-        tierToPercentage[2] = _percentage2; // 300 (3%)
-        tierToPercentage[3] = _percentage3; // 500 (5%)
+        tierToPercentage[1] = _percentage1; // 10 (0.1%)
+        tierToPercentage[2] = _percentage2; // 30 (0.3%)
+        tierToPercentage[3] = _percentage3; // 50 (0.5%)
         premiumDuration = _premiumDuration;
     }
 
@@ -77,7 +77,8 @@ contract InsuranceManager {
         uint256 amountToCover
     ) external {
         require(tierToPercentage[tier] != 0, "Tier is invalid");
-        uint256 premiumPrice = (amountToCover * tierToPercentage[tier]) / 10000;
+        uint256 premiumPrice = (amountToCover * tierToPercentage[tier]) /
+            100000;
 
         // update the policy state
         policies[msg.sender].lastPaidAt = block.timestamp;
@@ -147,7 +148,7 @@ contract InsuranceManager {
         uint256 amountToCover,
         uint256 tier
     ) external view returns (uint256) {
-        return (amountToCover * tierToPercentage[tier]) / 10000;
+        return (amountToCover * tierToPercentage[tier]) / 100000;
     }
 
     /**
